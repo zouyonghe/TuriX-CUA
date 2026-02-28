@@ -263,7 +263,7 @@ For bug reports and feature requests, please [open an issue](https://github.com/
 | **2025 Q4** | **✅ Planner** | Understands user intent and makes step-by-step plans to complete tasks |
 | **2025 Q4** | **✅ Multi-Agent Architecture** | Evaluate and guide each step in working |
 | **2025 Q4** | **✅ Duckduckgo Integration** | Speed up the information gathering process, for smarter planning (multi-agent branch) |
-| **2026 Q1** | **✅ Ollama Support** | Support the Ollama Qwen3vl models |
+| **2026 Q1** | **✅ Ollama Support** | Support the Ollama Qwen3.5vl models |
 | **2026 Q1** | **Recoverable Memory Compression** | Advance memory management mechanism to stabilize performance (beta in `multi-agent` & `multi-agent-windows` branches) |
 | **2026 Q1** | **Skills** | Stabilize the agent workflow (available in `multi-agent` & `multi-agent-windows` branches). |
 | **2026 Q1** | **Browser Automation** | Support a Chrome-like browser for scalability |
