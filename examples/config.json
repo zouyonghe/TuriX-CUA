@@ -3,7 +3,7 @@
   "output_dir": ".turix_tmp",
   "brain_llm": {
     "provider": "turix",
-    "model_name": "turix-brain",
+    "model_name": "gemini-3-flash-preview",
     "api_key": "your_api_key_here",
     "base_url": "https://turixapi.io/v1" 
   },
@@ -17,14 +17,14 @@
 
   "planner_llm": {
     "provider": "turix",
-    "model_name": "turix-brain",
+    "model_name": "gemini-3-flash-preview",
     "api_key": "your_api_key_here",
     "base_url": "https://turixapi.io/v1" 
   },
 
   "memory_llm": {
     "provider": "turix",
-    "model_name": "turix-brain",
+    "model_name": "gemini-3-flash-preview",
     "api_key": "your_api_key_here",
     "base_url": "https://turixapi.io/v1" 
   },
