@@ -212,27 +212,27 @@ osascript -e 'tell application "Safari" to do JavaScript "alert("Triggering acce
 ```json
 "brain_llm": {
       "provider": "turix",
-      "model_name": "turix-brain-model",
+      "model_name": "turix-brain",
       "api_key": "YOUR_API_KEY",
-      "base_url": "https://llm.turixapi.io/v1"
+      "base_url": "https://turixapi.io/v1"
    },
 "actor_llm": {
       "provider": "turix",
-      "model_name": "turix-actor-model",
+      "model_name": "turix-actor",
       "api_key": "YOUR_API_KEY",
-      "base_url": "https://llm.turixapi.io/v1"
+      "base_url": "https://turixapi.io/v1"
    },
 "memory_llm": {
       "provider": "turix",
-      "model_name": "turix-memory-model",
+      "model_name": "turix-brain",
       "api_key": "YOUR_API_KEY",
-      "base_url": "https://llm.turixapi.io/v1"
+      "base_url": "https://turixapi.io/v1"
    },
 "planner_llm": {
       "provider": "turix",
-      "model_name": "turix-planner-model",
+      "model_name": "turix-brain",
       "api_key": "YOUR_API_KEY",
-      "base_url": "https://llm.turixapi.io/v1"
+      "base_url": "https://turixapi.io/v1"
    }
 ```
 
