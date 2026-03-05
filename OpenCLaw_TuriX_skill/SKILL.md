@@ -1,11 +1,43 @@
 ---
-name: turix-win
-description: Computer Use Agent (CUA) for Windows 11 automation using TuriX. Use when you need to perform visual tasks on the desktop, such as opening apps, clicking buttons, or navigating UIs that don't have a CLI or API.
+name: turix
+description: "Dispatch desktop-computer-use tasks to TuriX on Windows (alias: turix-win). Trigger when users mention turix, computer use, CUA, or ask to send a task to Turix. Run directly via {baseDir}/scripts/run_turix.ps1 in the current session; do not require a separate Turix sub-session/sessionKey."
+user-invocable: true
 ---
 
-# TuriX-Win Skill
+# TuriX Skill (Windows)
 
-This skill allows Clawdbot to control the Windows desktop visually using the TuriX Computer Use Agent.
+This skill allows OpenClaw to control the Windows desktop visually using the TuriX Computer Use Agent.
+
+## Required Repository Branch (Windows)
+
+- Windows users must run TuriX from branch `multi-agent-windows`.
+- Do NOT use branch `main` with this Windows skill.
+- Recommended clone command:
+```powershell
+cd your_dir
+git clone -b multi-agent-windows --single-branch https://github.com/TurixAI/TuriX-CUA.git
+cd .\TuriX-CUA
+git branch --show-current
+```
+- The branch check must print `multi-agent-windows`.
+- `scripts/run_turix.ps1` also checks the active branch before launch (when `.git` metadata is available).
+
+## Dispatch Rules (Critical)
+
+- Trigger this skill when the user says `turix`, `TuriX`, `turix-win`, `computer use`, `CUA`, `desktop automation`, or asks to send a task to TuriX.
+- Do not block on "no Turix sub-session found". A child session is optional, not required.
+- Default behavior: dispatch immediately in the current session by running:
+```powershell
+powershell -ExecutionPolicy Bypass -File "{baseDir}/scripts/run_turix.ps1" "<TASK>"
+```
+- If the user explicitly asks for background execution:
+```powershell
+Start-Process powershell -ArgumentList "-ExecutionPolicy","Bypass","-File","{baseDir}/scripts/run_turix.ps1","<TASK>"
+```
+- If the user explicitly asks to continue an interrupted run:
+```powershell
+powershell -ExecutionPolicy Bypass -File "{baseDir}/scripts/run_turix.ps1" --resume <AGENT_ID>
+```
 
 ## When to Use
 
@@ -16,58 +48,59 @@ This skill allows Clawdbot to control the Windows desktop visually using the Tur
 
 ## Key Features
 
-### 🤖 Multi-Model Architecture
+### Multi-Model Architecture
 TuriX uses a sophisticated multi-model system:
-- **Brain**: Understands the task and generates step-by-step plans
-- **Actor**: Executes precise UI actions based on visual understanding
-- **Planner**: Coordinates high-level task decomposition (when `use_plan: true`)
-- **Memory**: Maintains context across task steps
+- Brain: Understands the task and generates step-by-step plans
+- Actor: Executes precise UI actions based on visual understanding
+- Planner: Coordinates high-level task decomposition (when `use_plan: true`)
+- Memory: Maintains context across task steps
 
-### 📋 Skills System
+### Skills System
 Skills are markdown playbooks that guide the agent for specific domains:
-- `browser-tasks`: General web browser operations (Chrome/Edge/Firefox)
-- Custom skills can be added to the `src/agent/skills/` directory
+- `github-web-actions`: GitHub navigation, repo search, starring
+- `browser-tasks`: General web browser operations
+- Custom skills can be added to the `skills/` directory
 
-### 🔄 Resume Capability
+### Resume Capability
 The agent can resume interrupted tasks by setting a stable `agent_id`.
 
 ## Running TuriX
 
 ### Basic Task
 ```powershell
-./scripts/run_turix.ps1 "Open Chrome and go to github.com"
+powershell -ExecutionPolicy Bypass -File "{baseDir}/scripts/run_turix.ps1" "Open Edge and go to github.com"
 ```
 
 ### Resume Interrupted Task
 ```powershell
-./scripts/run_turix.ps1 --resume my-task-001
+powershell -ExecutionPolicy Bypass -File "{baseDir}/scripts/run_turix.ps1" --resume my-task-001
 ```
 
-> ✅ **Note**: `run_turix.ps1` updates `examples/config.json` for you. If you want to keep a hand-edited config, skip passing a task and edit `examples/config.json` directly.
+> Note: `run_turix.ps1` updates `examples/config.json` for you (task, resume, `use_plan`, `use_skills`). If you want to keep a hand-edited config, skip passing a task and edit `examples/config.json` directly.
 
 ### Tips for Effective Tasks
 
-**✅ Good Examples:**
+Good examples:
 - "Open Edge, go to google.com, search for 'TuriX AI', and click the first result"
-- "Open Settings, click on Personalization, then change to Dark mode"
+- "Open Settings, click on Personalization, then switch to Dark mode"
 - "Open File Explorer, navigate to Documents, and create a new folder named 'Project X'"
 
-**❌ Avoid:**
+Avoid:
 - Vague instructions: "Help me" or "Fix this"
-- Impossible actions: "Format C: drive"
+- Impossible actions: "Delete all files"
 - Tasks requiring system-level permissions without warning
 
-**💡 Best Practices:**
-1. Be specific about the target application
-2. Break complex tasks into clear steps, but do not mention the precise coordinates on the screen.
+Best practices:
+1. Be specific about the target application.
+2. Break complex tasks into clear steps, but do not mention precise screen coordinates.
 
 ## Hotkeys
 
-- **Force Stop**: `Ctrl+Shift+2` - Immediately stops the agent
+- Force Stop: `Ctrl+Shift+2` - Immediately stops the agent
 
-## Monitoring & Logs
+## Monitoring and Logs
 
-Logs are saved to `AgentHistory.json` or `.turix_tmp/logging.log` in the project directory. Check this for:
+Logs are saved to `.turix_tmp/logging.log` in the project directory. Check this for:
 - Step-by-step execution details
 - LLM interactions and reasoning
 - Errors and recovery attempts
@@ -75,38 +108,65 @@ Logs are saved to `AgentHistory.json` or `.turix_tmp/logging.log` in the project
 ## Important Notes
 
 ### How TuriX Runs
-- TuriX can be started via clawdbot `exec`
-- The first launch takes 1-2 minutes to load models
-- Background output is buffered - you won't see live progress until task completes or stops
+- TuriX can be started via OpenClaw `exec` with `pty:true` mode.
+- The first launch takes 2-5 minutes to load all AI models (Brain, Actor, Planner, Memory).
+- Background output is buffered; you may not see live progress until task completes or stops.
 
 ### Before Running
-**Ensure Conda environment is ready:**
+Always ensure PATH and environment are ready:
 ```powershell
-conda activate turix_env
-python examples/main.py
+# Example (adjust for your Conda install path)
+$env:Path = "your_conda_dir;your_conda_dir\Scripts;$env:Path"
+cd your_dir\TuriX-CUA
+conda run -n turix_env python examples/main.py
 ```
 
-### Troubleshooting
+Published package note:
+- `your_dir` is a placeholder path in the shared version. Replace it with your own local TuriX project path before running.
 
-| Error                                                       | Solution                                                                                                    |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `AttributeError: 'NoneType' object has no attribute 'save'` | Screen recording failed. Ensure VS Code/Terminal has necessary permissions.                                 |
-| `uiautomation error`                                        | Ensure `uiautomation` is installed and the target app is not running as Administrator if the script is not. |
-| `Conda environment not found`                               | Ensure `turix_env` exists: `conda create -n turix_env python=3.12`                                          |
-| Module import errors                                        | Activate environment: `conda activate turix_env` then `pip install -r requirements.txt`                     |
+Why? If `conda` is unavailable in PATH, the helper script cannot start TuriX.
+
+### Checking if TuriX is Running
+```powershell
+# Check process by command line
+Get-CimInstance Win32_Process |
+  Where-Object { $_.CommandLine -match "python.*examples/main.py" } |
+  Select-Object ProcessId, Name, CommandLine
+```
+
+Note: `.turix_tmp` may not be created until TuriX starts executing steps.
+
+## Troubleshooting
+
+### Common Issues
+
+| Error | Solution |
+|-------|----------|
+| `NoneType has no attribute 'save'` | Screen capture or desktop session issue. Keep desktop unlocked and visible. |
+| `uiautomation error` | Ensure `uiautomation` is installed and avoid privilege mismatch (admin app vs non-admin runner). |
+| `Conda environment not found` | Ensure `turix_env` exists: `conda create -n turix_env python=3.12` |
+| Module import errors | Activate environment: `conda activate turix_env` then `pip install -r requirements.txt` |
+| Keyboard listener permission issues | Run terminal and target app at compatible privilege level. |
+
+### Debug Mode
+
+Logs include DEBUG level by default. Check:
+```powershell
+Get-Content -Wait your_dir\TuriX-CUA\.turix_tmp\logging.log
+```
 
 ## Architecture
 
 ```
 User Request
-     ↓
-[Clawdbot] → [TuriX Skill] → [run_turix.ps1] → [TuriX Agent]
-                                               ↓
-                    ┌─────────────────────────┼─────────────────────────┐
-                    ↓                         ↓                         ↓
-                [Planner]                 [Brain]                  [Memory]
-                     ↓                         ↓                         ↓
-                                          [Actor] ───→ [Controller] ───→ [Windows UI]
+     v
+[OpenClaw] -> [TuriX Skill] -> [run_turix.ps1] -> [TuriX Agent]
+                                                   v
+                    +------------------------------+------------------------------+
+                    v                              v                              v
+               [Planner]                      [Brain]                        [Memory]
+                    v                              v                              v
+                                              [Actor] ----> [Controller] ----> [Windows UI]
 ```
 
 ## Skill System Details
@@ -122,11 +182,32 @@ description: When to use this skill
 High-level workflow like: Open Edge, then go to Google.
 ```
 
+The Planner selects relevant skills based on name/description; the Brain uses full content for step guidance.
+
+## Advanced Options
+
+| Option | Description |
+|--------|-------------|
+| `use_plan: true` | Enable planning for complex tasks |
+| `use_skills: true` | Enable skill selection |
+| `resume: true` | Resume from previous interruption |
+| `max_steps: N` | Limit total steps (default: 100) |
+| `max_actions_per_step: N` | Actions per step (default: 5) |
+| `force_stop_hotkey` | Custom hotkey to stop agent |
+
+---
+
 ## TuriX Skills System
 
-TuriX supports **Skills**: markdown playbooks that help the agent behave more reliably in specific domains.
+TuriX supports Skills: markdown playbooks that help the agent behave more reliably in specific domains.
 
-### 1. Create a Custom Skill
+### 1. Built-in Skills
+
+| Skill | Use |
+|-------|-----|
+| `github-web-actions` | GitHub web actions (search repos, star, etc.) |
+
+### 2. Create a Custom Skill
 
 Create a `.md` file in the TuriX project's `skills/` directory:
 
@@ -143,7 +224,12 @@ description: When performing X specific task
 - Step 3: Verify the result
 ```
 
-### 2. Enable Skills
+Field definitions:
+- `name`: Skill identifier (used by the Planner to select)
+- `description`: When to use this skill (Planner matches on this)
+- Body below frontmatter: Full execution guide (used by the Brain)
+
+### 3. Enable Skills
 
 In `examples/config.json`:
 
@@ -158,21 +244,39 @@ In `examples/config.json`:
 }
 ```
 
-### 3. Run a Task with Skills
+### 4. Run a Task with Skills
 
 ```powershell
-./scripts/run_turix.ps1 "Search for turix-cua on GitHub and star it"
+powershell -ExecutionPolicy Bypass -File "{baseDir}/scripts/run_turix.ps1" "Search for turix-cua on GitHub and star it"
 ```
 
-### 4. Chinese Text Support
+The agent will automatically:
+1. Planner reads the skill name and description.
+2. Selects relevant skills.
+3. Brain uses full skill content to guide execution.
 
-The `run_turix.ps1` script handles UTF-8 correctly by default in PowerShell.
+### 5. Chinese Text Support
 
-### 5. Document Creation Best Practices
+Background:
+Passing Chinese text through shell interpolation can mangle UTF-8, and interpolating untrusted text is unsafe.
 
-**Recommended approach:** create the document yourself and let TuriX only send it
-1. Create the Word document with `python-docx`
-2. Let TuriX only send the file
+Solution:
+The `run_turix.ps1` script writes config as UTF-8 and passes task text as normal PowerShell argument text.
+
+Key points:
+1. Always use UTF-8 when reading/writing config files.
+2. Do not manually convert task text to escaped ASCII.
+3. Prefer passing full task content as one quoted argument.
+
+### 6. Document Creation Best Practices
+
+Challenges:
+- Asking TuriX to collect news, then create and send a document directly.
+- TuriX is a GUI agent, so it can be slower and less deterministic.
+
+Recommended approach: create the document yourself and let TuriX only send it.
+1. Create the Word document with `python-docx`.
+2. Let TuriX only send the file.
 
 ```python
 from docx import Document
@@ -181,9 +285,150 @@ doc.add_heading('Title')
 doc.save('C:/path/to/file.docx')
 ```
 
-### 6. Debugging Tips
+Suggested workflow:
+1. Use web tools to gather information.
+2. Use Python to create the Word document.
+3. Use TuriX to send the file. Specify the full file path.
+4. If you really need TuriX to create a document manually, place structured guidance in TuriX skills.
 
-1. **Inspect Brain reasoning**: check logic interaction logs for `analysis` and `next_goal`
-2. **Inspect Actor actions**: check actor interaction logs for actions
-3. **Check screenshots**: TuriX captures a screenshot each step
-4. **Read record files**: the agent uses `record_info` to save key info to `.txt` files
+### 7. Example: Add a New Skill
+
+Create `skills/browser-tasks.md`:
+
+```md
+---
+name: browser-tasks
+description: When performing tasks in a web browser (search, navigate, fill forms).
+---
+# Browser Tasks
+
+## Navigation
+- Use the address bar or search box to navigate
+- Open new tabs for each distinct task
+- Wait for page to fully load before proceeding
+
+## Forms
+- Click on input fields to focus
+- Type content clearly
+- Look for submit/button to complete actions
+
+## Safety
+- Confirm before submitting forms
+- Do not download files without user permission
+```
+
+### 8. Skill Development Tips
+
+1. Be precise in the description - helps the Planner select correctly.
+2. Make steps clear - the Brain needs explicit guidance.
+3. Include safety checks - confirmations for important actions.
+4. Keep it concise - recommended under 4000 characters per skill file.
+
+---
+
+## Monitoring and Debugging Guide
+
+### 1. Run a Task
+
+```powershell
+# Run directly
+powershell -ExecutionPolicy Bypass -File "{baseDir}/scripts/run_turix.ps1" "Your task description"
+
+# Run in background
+Start-Process powershell -ArgumentList "-ExecutionPolicy","Bypass","-File","{baseDir}/scripts/run_turix.ps1","Your task description"
+```
+
+### 2. Monitor Progress
+
+Method 1: OpenClaw session/log view
+```powershell
+openclaw sessions --all-agents
+openclaw logs --follow
+```
+
+Method 2: TuriX logs
+```powershell
+Get-Content -Wait your_dir\TuriX-CUA\.turix_tmp\logging.log
+```
+
+Method 3: Check processes
+```powershell
+Get-CimInstance Win32_Process |
+  Where-Object { $_.CommandLine -match "python.*examples/main.py" }
+```
+
+Method 4: Check generated files
+```powershell
+Get-ChildItem your_dir\TuriX-CUA\.turix_tmp\*.txt
+```
+
+### 3. Log File Reference
+
+| File | Description |
+|------|-------------|
+| `logging.log` | Main log file |
+| `brain_llm_interactions.log_brain_N.txt` | Brain model conversations (one per step) |
+| `actor_llm_interactions.log_actor_N.txt` | Actor model conversations (one per step) |
+
+Key log markers:
+- `Step N` - New step started
+- `Eval: Success/Failed` - Current step evaluation
+- `Goal to achieve this step` - Current goal
+- `Action` - Executed action
+- `Task completed successfully` - Task completed
+
+### 4. Common Monitoring Issues
+
+| Issue | Check |
+|-------|-------|
+| Process unresponsive | process list for `examples/main.py` |
+| Stuck on step 1 | whether `.turix_tmp/` was created |
+| Model loading is slow | first run can take 1-2 minutes |
+| No log output | check `config.json` `logging_level` |
+
+### 5. Force Stop
+
+Hotkey: `Ctrl+Shift+2` - stop the agent immediately
+
+Command:
+```powershell
+Get-CimInstance Win32_Process |
+  Where-Object { $_.CommandLine -match "python.*examples/main.py" } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+### 6. View Results
+
+After completion, the agent will:
+1. Create interaction logs in `.turix_tmp/`.
+2. Create record files (if `record_info` is used).
+3. Keep screenshots in memory for subsequent steps.
+
+Example: view a summary file
+```powershell
+Get-Content your_dir\TuriX-CUA\.turix_tmp\latest_ai_news_summary_jan2026.txt
+```
+
+### 7. Debugging Tips
+
+1. Inspect Brain reasoning: check `brain_llm_interactions.log_brain_*.txt` for `analysis` and `next_goal`.
+2. Inspect Actor actions: check `actor_llm_interactions.log_actor_*.txt`.
+3. Check screenshots: TuriX captures a screenshot each step (kept in memory).
+4. Read record files: the agent uses `record_info` to save key info into `.txt` files.
+
+### 8. Example Monitoring Flow
+
+```powershell
+# 1. Run a task
+Start-Process powershell -ArgumentList "-ExecutionPolicy","Bypass","-File","{baseDir}/scripts/run_turix.ps1","Search AI news and summarize"
+
+# 2. Wait and check process
+Start-Sleep -Seconds 10
+Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "examples/main.py" }
+
+# 3. Check if logs are being created
+Get-ChildItem your_dir\TuriX-CUA\.turix_tmp\
+
+# 4. Tail progress in real time
+Get-Content -Wait your_dir\TuriX-CUA\.turix_tmp\logging.log
+```

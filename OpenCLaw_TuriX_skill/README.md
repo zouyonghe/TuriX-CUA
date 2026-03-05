@@ -1,54 +1,113 @@
-# 🐾 TuriX-Win Clawdbot Skill
+# TuriX Skill for OpenClaw (Windows)
 
-This skill allows Clawdbot to control your Windows desktop visually by integrating with the **TuriX Computer Use Agent (CUA)**.
+This package adds a local OpenClaw skill that dispatches desktop-computer-use tasks to TuriX on Windows.
 
-## 🚀 Overview
-TuriX acts as the "eyes and hands" for Clawdbot. While Clawdbot is great at terminal and file operations, TuriX allows it to:
-- Open and navigate GUI applications (Spotify, Chrome, Settings, etc.)
-- Click buttons and interact with complex UIs.
-- Perform multi-step visual workflows.
+## Package Contents
 
-It helps clawdbot complete the task automatically, makes clawdbot the real digital labour!
+- `SKILL.md`
+- `scripts/run_turix.ps1`
+- `agents/openai.yaml`
 
-## 📦 Installation & Setup
+## 1. Install TuriX-CUA (Windows branch required)
 
-### 1. TuriX Core Setup
-Set up TuriX following the official repository (Windows branch):
-`https://github.com/TurixAI/TuriX-CUA`
+Use the Windows branch only:
 
 ```powershell
+cd $env:USERPROFILE\Desktop
+git clone -b multi-agent-windows --single-branch https://github.com/TurixAI/TuriX-CUA.git
+cd .\TuriX-CUA
+git branch --show-current
+```
+
+Expected output:
+
+```text
+multi-agent-windows
+```
+
+## 2. Prepare Conda Environment
+
+This skill uses `turix_env` by default (same value in `SKILL.md` and `scripts/run_turix.ps1`).
+
+```powershell
+conda create -n turix_env python=3.12 -y
 conda activate turix_env
 pip install -r requirements.txt
 ```
 
-### 2. Skill Configuration
-The skill uses a helper script to bridge Clawdbot and TuriX.
-- **Helper Script:** `scripts/run_turix.ps1`
-- **Skill Definition:** `SKILL.md`
+If you use another env name, update both:
 
-## 🛠 Usage
+- `scripts/run_turix.ps1` (`$EnvName`)
+- Any env examples in `SKILL.md`
 
-In your 
+## 3. Configure API Keys (Required)
+
+Before running tasks, configure API/model keys first, otherwise the run will fail.
+
+- Recommended platform: `https://turixapi.io/console`
+- Suggested setup: keep actor on `turix-actor`, choose a fast/stable brain model from the same platform.
+
+## 4. Install This Skill into OpenClaw
+
+Copy this folder into OpenClaw workspace skills:
+
 ```powershell
-your_dir/clawd/skills/local/turix-win
-```
-put the files in this structure:
-```
-your_dir/clawd/skills/local/turix-win/
-├── README.md
-├── SKILL.md
-└── scripts/
-    └── run_turix.ps1
+$skillRoot = "$env:USERPROFILE\.openclaw\workspace\skills"
+New-Item -ItemType Directory -Force -Path $skillRoot | Out-Null
+Copy-Item -Recurse -Force ".\turix-cua-windows" $skillRoot
 ```
 
-You can trigger this skill by asking Clawdbot to perform visual tasks:
-> "Use Edge to go to turix.ai, and sign up with Google account."
+Final path:
 
-Clawdbot will execute the following in the background:
+```text
+%USERPROFILE%\.openclaw\workspace\skills\turix-cua-windows
+```
+
+## 5. Replace Placeholder Path
+
+Edit:
+
+- `%USERPROFILE%\.openclaw\workspace\skills\turix-cua-windows\scripts\run_turix.ps1`
+
+Replace:
+
+- `your_dir\TuriX-CUA`
+
+With your real local path, for example:
+
+- `C:\Users\<YOU>\Desktop\TuriX-CUA`
+
+## 6. Verify Skill and Runtime
+
+Check skill loading:
+
 ```powershell
-powershell ./scripts/run_turix.ps1 "Your task here"
+openclaw skills info turix
 ```
 
-## 🔍 Troubleshooting
-- **`AttributeError: 'NoneType' object has no attribute 'save'`**: This means the screen capture failed. Ensure your Terminal/IDE has screen capture permissions.
-- **`uiautomation error`**: Ensure the `uiautomation` library is correctly installed and that the target application is accessible.
+Dry run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.openclaw\workspace\skills\turix-cua-windows\scripts\run_turix.ps1" --dry-run "Open Edge and search TuriX"
+```
+
+Real task:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.openclaw\workspace\skills\turix-cua-windows\scripts\run_turix.ps1" "Open Edge and go to youtube.com"
+```
+
+## 7. Trigger from OpenClaw Chat
+
+Example prompts:
+
+- `Send task to turix: open Chrome and go to YouTube`
+- `turix: open Settings and switch to dark mode`
+
+## 8. Publish Checklist
+
+- Branch is `multi-agent-windows`
+- Conda env naming is consistent (`turix_env`)
+- `run_turix.ps1` placeholder path instructions are clear
+- API setup reminder is present (`https://turixapi.io/console`)
+- `openclaw skills info turix` returns ready
