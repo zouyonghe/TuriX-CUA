@@ -354,7 +354,33 @@ class MacUITreeBuilder:
         try:
             logger.debug('Capturing screenshot............................................................')
             screenshot = pyautogui.screenshot()
-            screenshot.thumbnail((screenshot.width // 2, screenshot.height // 2))
+            width, height = screenshot.size
+            max_dim = max(width, height)
+            scale_factor = 1
+
+            # 720p/1080p: no resize
+            # 2K/4K (and other >2200px but <8K): divide by 2
+            # 8K/16K: divide by 4
+            if max_dim >= 7680:
+                scale_factor = 4
+            elif max_dim > 2200:
+                scale_factor = 2
+
+            if scale_factor > 1:
+                target_size = (max(1, width // scale_factor), max(1, height // scale_factor))
+                if hasattr(Image, "Resampling"):
+                    resample = Image.Resampling.LANCZOS
+                else:
+                    resample = Image.LANCZOS
+                screenshot = screenshot.resize(target_size, resample=resample)
+                logger.debug(
+                    "Downscaled screenshot from %sx%s to %sx%s (scale factor: %s)",
+                    width,
+                    height,
+                    screenshot.width,
+                    screenshot.height,
+                    scale_factor,
+                )
             self._screenshot = screenshot
             return self._screenshot
         except Exception as e:
