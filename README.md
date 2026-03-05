@@ -50,12 +50,16 @@ Use TuriX via OpenClaw with our published skill on ClawHub:
 https://clawhub.ai/Tongyu-Yan/turix-cua  
 This lets OpenClaw call TuriX so it can act as your desktop agent.
 
-Local OpenCLaw skill (windows): this repo also includes a ready-to-use skill package in `OpenCLaw_TuriX_skill/` (`SKILL.md` + `scripts/run_turix.ps1`).  
-Copy it into your OpenClaw local skills folder (for example: `clawd/skills/local/turix-mac/`) and follow `OpenCLaw_TuriX_skill/README.md` for setup and permissions.
+Local OpenClaw skill (Windows): this branch includes a ready-to-use package in `OpenCLaw_TuriX_skill/` (`SKILL.md`, `scripts/run_turix.ps1`, and `agents/openai.yaml`).  
+Copy it into your OpenClaw local skills folder (for example: `clawd/skills/local/turix-windows/`) and follow `OpenCLaw_TuriX_skill/README.md` for setup and permissions.
+This update adds direct dispatch via `turix` (alias `turix-win`) in the current OpenClaw session, plus pre-flight checks in `run_turix.ps1` (branch validation, conda/config checks, and `--dry-run` support).
+You can also instruct OpenClaw directly: read `OpenCLaw_TuriX_skill/README.md` first, then install and configure TuriX.
 
 ---
 
 ## 📰 Latest News
+
+**March 5, 2026** - Updated the **Windows OpenClaw local skill** on branch `multi-agent-windows`. This update adds a user-invocable `turix` skill alias, direct dispatch without requiring a Turix sub-session, branch-safe pre-flight checks in `run_turix.ps1`, and the new agent interface file `OpenCLaw_TuriX_skill/agents/openai.yaml`.
 
 **January 30, 2026** - 🧩 We published the **TuriX OpenClaw Skill** on ClawHub: https://clawhub.ai/Tongyu-Yan/turix-cua. You can now use OpenClaw to call TuriX and automate desktop tasks.
 
@@ -114,6 +118,8 @@ For more details, check our [report](https://turix.ai/technical-report/).
 ## 🚀 Quick‑Start (Windows)
 
 > **We never collect data**—install, grant permissions, and hack away.
+>
+> For OpenClaw local skill installation, read `OpenCLaw_TuriX_skill/README.md` first.
 
 ### 1. Download the App
 For easier usage, [download the app](https://turix.ai/)
@@ -308,6 +314,7 @@ For bug reports and feature requests, please [open an issue](https://github.com/
 | **2026 Q1** | **✅ Recoverable Memory Compression** | Advance memory management mechanism to stabelize performance (Commited beta version) |
 | **2026 Q1** | **✅ Skills** | Stablize the agent workflow. |
 | **2026 Q1** | **✅ OpenClaw Skill** | Published on ClawHub (https://clawhub.ai/Tongyu-Yan/turix-cua) so OpenClaw can use TuriX as its eyes and hands. |
+| **2026 Q1** | **✅ OpenClaw Windows Skill Refresh** | Updated `multi-agent-windows` local skill package with direct dispatch (`turix`/`turix-win`), required-branch checks, and `--dry-run` support. |
 | **2026 Q1** | **Browser Automation** | Support a Chrome-like browser for scalability |
 | **2026 Q1** | **Persistent Memory** | Learn user preferences and maintain task history across sessions |
 | **2026 Q2** | **Learning by Demonstration** | Train the agent by showing it your preferred methods and workflows |

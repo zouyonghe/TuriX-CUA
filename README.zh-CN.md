@@ -52,12 +52,16 @@ TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
 https://clawhub.ai/Tongyu-Yan/turix-cua  
 这让 OpenClaw 可以调用 TuriX，作为你的桌面操作 Agent。
 
-本仓库还提供 OpenCLaw 的本地技能包（Windows），位于 `OpenCLaw_TuriX_skill/`（包含 `SKILL.md` 与 `scripts/run_turix.ps1`）。  
+本仓库还提供 OpenCLaw 的本地技能包（Windows），位于 `OpenCLaw_TuriX_skill/`（包含 `SKILL.md`、`scripts/run_turix.ps1` 与 `agents/openai.yaml`）。  
 将其复制到你的 OpenClaw 本地技能目录（例如：`clawd/skills/local/turix-windows/`），并参考 `OpenCLaw_TuriX_skill/README.md` 完成安装与权限设置。
+该更新支持在当前 OpenClaw 会话中通过 `turix`（别名 `turix-win`）直接分发任务，并在 `run_turix.ps1` 中增加了预检查（分支校验、conda/config 校验、`--dry-run` 支持）。
+你也可以直接让 OpenClaw 先阅读 `OpenCLaw_TuriX_skill/README.md`，再按文档安装并配置 TuriX。
 
 ---
 
 ## <a id="latest-news"></a>📰 最新动态
+
+**2026 年 3 月 5 日** - 我们更新了 `multi-agent-windows` 分支上的 **OpenClaw Windows 本地技能包**。本次更新加入可直接调用的 `turix` 技能别名、无需 Turix 子会话的直接分发机制、`run_turix.ps1` 的分支安全预检查，以及新的代理接口文件 `OpenCLaw_TuriX_skill/agents/openai.yaml`。
 
 **2026 年 1 月 30 日** - 🧩 我们在 ClawHub 发布了 **TuriX OpenClaw 技能**：https://clawhub.ai/Tongyu-Yan/turix-cua。你现在可以使用 OpenClaw 调用 TuriX 来完成桌面自动化任务。
 
@@ -116,6 +120,8 @@ https://clawhub.ai/Tongyu-Yan/turix-cua
 ## <a id="quickstart-windows"></a>🚀 快速开始（Windows 11）
 
 > **我们从不收集数据**——安装、授权，尽情折腾。
+>
+> 如需通过 OpenClaw 安装本地技能，请先阅读 `OpenCLaw_TuriX_skill/README.md`。
 
 
 ### <a id="download-app"></a>1. 下载应用
@@ -304,6 +310,7 @@ python examples/main.py
 | **2026 Q1** | **✅ 可恢复的内存压缩** | 推进内存管理机制，稳定性能（上传了测试版，待验证稳定性） |
 | **2026 Q1** | **✅ Skills** | 让CUA的执行流程更标准化，稳定 |
 | **2026 Q1** | **✅ OpenClaw 技能** | 已在 ClawHub 发布（https://clawhub.ai/Tongyu-Yan/turix-cua），让 OpenClaw 调用 TuriX 作为眼睛和手执行电脑任务。 |
+| **2026 Q1** | **✅ OpenClaw Windows 技能升级** | 已完成 `multi-agent-windows` 本地技能包更新，支持 `turix`/`turix-win` 直接分发、分支校验与 `--dry-run`。 |
 | **2026 Q1** | **浏览器自动化** | 支持类 Chrome 浏览器以提升可扩展性 |
 | **2026 Q1** | **长期记忆** | 学习用户偏好并跨会话保留任务历史 |
 | **2026 Q2** | **示范学习** | 通过展示你偏好的方法与流程来训练Agent模型 |
