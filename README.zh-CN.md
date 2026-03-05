@@ -20,6 +20,8 @@
    </a>
 </p>
 
+如果对我们的项目感兴趣，也欢迎加入我们的微信群![QRcode](https://github.com/Dennisyk348/QRcode/blob/main/QRcode_0304.jpg)
+
 或通过邮件联系我们：contact@turix.ai
 
 TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
@@ -29,7 +31,7 @@ TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
 
 ## 目录
 - [📞 联系方式与社区](#contact-community)
-- [🤖 ClawDBot 技能](#clawdbot-skill)
+- [🤖 OpenClaw 技能](#openclaw-skill)
 - [📰 最新动态](#latest-news)
 - [🖼️ 演示](#demos)
 - [✨ 关键特性](#key-features)
@@ -38,30 +40,36 @@ TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
    - [1. 下载应用](#download-app)
    - [2. 创建 Python 3.12 环境](#create-python-env)
    - [3. 配置并运行](#configure-run)
-   - [3. 配置并运行](#configure-run)
    - [3.4 Skills（可选）](#skills-optional)
 - [🤝 贡献指南](#contributing)
 - [🗺️ 开发规划](#roadmap)
 
 ---
 
-## <a id="clawdbot-skill"></a>🤖 ClawDBot 技能
+## <a id="openclaw-skill"></a>🤖 OpenClaw 技能
 
-通过 ClawDBot 使用 TuriX 的 ClawHub Skills：  
-https://clawdhub.com/Tongyu-Yan/turix-computer-use  
-这让 ClawDBot 可以调用 TuriX，作为你的桌面操作 Agent。
+通过 OpenClaw 使用 TuriX 的 ClawHub Skills：  
+https://clawhub.ai/Tongyu-Yan/turix-cua  
+这让 OpenClaw 可以调用 TuriX，作为你的桌面操作 Agent。
+
+本仓库还提供 OpenCLaw 的本地技能包（Windows），位于 `OpenCLaw_TuriX_skill/`（包含 `SKILL.md` 与 `scripts/run_turix.ps1`）。  
+将其复制到你的 OpenClaw 本地技能目录（例如：`clawd/skills/local/turix-windows/`），并参考 `OpenCLaw_TuriX_skill/README.md` 完成安装与权限设置。
 
 ---
 
 ## <a id="latest-news"></a>📰 最新动态
 
-**2026 年 1 月 30 日** - 🧩 我们在 ClawHub 发布了 **TuriX ClawDBot 技能**。你现在可以使用 ClawDBot 调用 TuriX 来完成桌面自动化任务。
+**2026 年 1 月 30 日** - 🧩 我们在 ClawHub 发布了 **TuriX OpenClaw 技能**：https://clawhub.ai/Tongyu-Yan/turix-cua。你现在可以使用 OpenClaw 调用 TuriX 来完成桌面自动化任务。
+
+**2026 年 1 月 27 日 — v0.3** - 🎉 TuriX v0.3 已在 main 分支发布！本次更新带来 DuckDuckGo 搜索、Ollama 支持、先进的可恢复内存压缩，以及 Skills（技能手册），让规划更智能、记忆更稳健、工作流更可复用。欢迎更多用户体验并分享反馈，我们会持续推进平台进化。
 
 **2026 年 1 月 27 日** - 🎉 我们在 `multi-agent` 与 `multi-agent-windows` 分支发布了 **可恢复的内存压缩** 和 **Skills**。这两项功能带来更稳定的记忆管理与可复用的 Markdown 技能手册，用于规划与执行任务。
 
-**2025 年 12 月 30 日** - 🎉Agent架构迎来重要更新。我们在 multi-agent 分支引入多模型架构，将单一模型的压力分散到多个模型上，以减轻注意力机制的负担。
+**2026 年 1 月 27 日** - 🎉 我们在 `main`（原 `multi-agent`）与 `multi-agent-windows` 分支发布了 **可恢复的内存压缩** 和 **Skills**。这两项功能带来更稳定的记忆管理与可复用的 Markdown 技能手册，用于规划与执行任务。
 
-**2025 年 10 月 16 日** - 🚀 自动化爱好者的重大消息！TuriX 现已全面支持前沿的 **Qwen3-VL** 视觉语言模型，赋能 **Windows** 的顺畅自动化。基于我们的内部基准，该集成在复杂 UI 交互上可将成功率提升多达 15%。无论你是在脚本化日常流程还是处理复杂项目，Qwen3-VL 的多模态推理都能带来前所未有的精度。
+**2025 年 12 月 30 日** - 🎉Agent架构迎来重要更新。我们在 `main`（原 `multi-agent`）分支引入多模型架构，将单一模型的压力分散到多个模型上，以减轻注意力机制的负担。
+
+**2025 年 10 月 16 日** - 🚀 自动化爱好者的重大消息！TuriX 现已全面支持前沿的 **Qwen3-VL** 视觉语言模型，赋能 **macOS** 与 **Windows** 的顺畅自动化。基于我们的内部基准，该集成在复杂 UI 交互上可将成功率提升多达 15%。无论你是在脚本化日常流程还是处理复杂项目，Qwen3-VL 的多模态推理都能带来前所未有的精度。
 
 **2025 年 9 月 30 日** - 🎉 激动人心的更新！我们在 [TuriX API 平台](https://turixapi.io) 发布了最新 AI 模型，带来更强性能、更聪明的推理以及更顺滑的集成，帮助你实现更强大的桌面自动化。开发者和研究者，现在就去平台获取并升级你的工作流！
 
@@ -107,11 +115,13 @@ https://clawdhub.com/Tongyu-Yan/turix-computer-use
 
 ## <a id="quickstart-windows"></a>🚀 快速开始（Windows 11）
 
-> **我们从不收集数据**——安装、配置，尽情折腾。
+> **我们从不收集数据**——安装、授权，尽情折腾。
 
 
 ### <a id="download-app"></a>1. 下载应用
-Windows 暂无桌面应用，请按下面的手动步骤安装：
+为了更方便使用，[下载应用](https://turix.ai/)
+
+或按下面的手动步骤安装：
 
 ### <a id="create-python-env"></a>2. 创建 Python 3.12 环境
 首先克隆仓库并运行：
@@ -143,33 +153,33 @@ Windows 版本没有 use_ui 参数，状态只有截图。
 从我们的[官网](https://turix.ai/api-platform/)获取 API，现在可获 $20 额度。
 登录网站，密钥在页面底部。
 在这个 main（multi-agent）分支，你需要同时配置 brain、actor 和 memory 模型；目前该特性仅支持苹果电脑。如果开启规划（`agent.use_plan: true`），还需要配置 planner 模型。
-我们强烈建议你将 turix-actor 模型作为 actor。brain 可以使用你喜欢的任意 VLM，我们的平台提供 qwen3vl。Gemini-3-pro 被测试为最聪明，Gemini-3-flash 也足够快且智能，适合大多数任务。
+我们强烈建议你将 turix-actor 模型作为 actor。brain 可以使用你喜欢的任意 VLM，我们的API平台提供 Gemini-3-flash作为brain，它足够快且智能，适合大多数任务。
 
 在 `examples/config.json` 中编辑 API：
 ```json
 "brain_llm": {
       "provider": "turix",
-      "model_name": "turix-brain-model",
+      "model_name": "gemini-3-flash-preview",
       "api_key": "YOUR_API_KEY",
-      "base_url": "https://llm.turixapi.io/v1"
+      "base_url": "https://turixapi.io/v1"
    },
 "actor_llm": {
       "provider": "turix",
-      "model_name": "turix-actor-model",
+      "model_name": "turix-actor",
       "api_key": "YOUR_API_KEY",
-      "base_url": "https://llm.turixapi.io/v1"
+      "base_url": "https://turixapi.io/v1"
    },
 "memory_llm": {
       "provider": "turix",
-      "model_name": "turix-memory-model",
+      "model_name": "gemini-3-flash-preview",
       "api_key": "YOUR_API_KEY",
-      "base_url": "https://llm.turixapi.io/v1"
+      "base_url": "https://turixapi.io/v1"
    },
 "planner_llm": {
       "provider": "turix",
-      "model_name": "turix-planner-model",
+      "model_name": "gemini-3-flash-preview",
       "api_key": "YOUR_API_KEY",
-      "base_url": "https://llm.turixapi.io/v1"
+      "base_url": "https://turixapi.io/v1"
    }
 ```
 
@@ -289,11 +299,11 @@ python examples/main.py
 | **2025 Q4** | **✅ 支持 Gemini-3-pro 模型** | 可运行任意兼容的视觉语言模型 |
 | **2025 Q4** | **✅ 规划器** | 理解用户意图并制定分步计划以完成任务 |
 | **2025 Q4** | **✅ 多智能体架构** | 评估并指导每一步执行 |
-| **2025 Q4** | **✅ Duckduckgo 集成** | 加速信息收集，提升规划效果（multi-agent 分支） |
+| **2025 Q4** | **✅ Duckduckgo 集成** | 加速信息收集，提升规划效果（现已并入 main） |
 | **2026 Q1** | **✅ Ollama 支持** | 支持 Ollama Qwen3vl 模型 |
 | **2026 Q1** | **✅ 可恢复的内存压缩** | 推进内存管理机制，稳定性能（上传了测试版，待验证稳定性） |
 | **2026 Q1** | **✅ Skills** | 让CUA的执行流程更标准化，稳定 |
-| **2026 Q1** | **OpenClaw（ClawDBot）技能** | 集成 ClawDBot（OpenClaw），作为clawdbot的眼睛和手，执行电脑任务。让你的OpenClaw成为完整的数字员工。 |
+| **2026 Q1** | **✅ OpenClaw 技能** | 已在 ClawHub 发布（https://clawhub.ai/Tongyu-Yan/turix-cua），让 OpenClaw 调用 TuriX 作为眼睛和手执行电脑任务。 |
 | **2026 Q1** | **浏览器自动化** | 支持类 Chrome 浏览器以提升可扩展性 |
 | **2026 Q1** | **长期记忆** | 学习用户偏好并跨会话保留任务历史 |
 | **2026 Q2** | **示范学习** | 通过展示你偏好的方法与流程来训练Agent模型 |
