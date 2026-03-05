@@ -108,6 +108,36 @@ def register_force_stop_hotkey(
     listener.start()
     return listener
 
+
+def configure_llm_capabilities(llm, *, supports_tool_calling: bool, supports_response_format: bool):
+    setattr(llm, "_turix_supports_tool_calling", supports_tool_calling)
+    setattr(llm, "_turix_supports_response_format", supports_response_format)
+    return llm
+
+
+def build_openai_compatible_llm(
+    *,
+    model_name: str,
+    api_key: str | None,
+    base_url: str,
+    temperature: float = 0.1,
+    supports_tool_calling: bool = True,
+    supports_response_format: bool = True,
+):
+    if not model_name:
+        raise ValueError("OpenAI-compatible provider requires 'model_name'.")
+    llm = ChatOpenAI(
+        model=model_name,
+        openai_api_base=base_url,
+        openai_api_key=api_key,
+        temperature=temperature,
+    )
+    return configure_llm_capabilities(
+        llm,
+        supports_tool_calling=supports_tool_calling,
+        supports_response_format=supports_response_format,
+    )
+
 def build_llm(cfg: dict):
     provider = cfg["provider"].lower()
     api_key  = cfg.get("api_key") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -117,11 +147,41 @@ def build_llm(cfg: dict):
     if provider == "turix":
         if not base_url:
             raise ValueError("OpenAI‑compatible provider requires 'base_url'.")
-        return ChatOpenAI(
-            model=model_name,
-            openai_api_base=base_url,
-            openai_api_key=api_key,
+        return build_openai_compatible_llm(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url,
             temperature=0.1,
+        )
+
+    if provider == "deepseek":
+        return build_openai_compatible_llm(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url or "https://api.deepseek.com/v1",
+            temperature=0.1,
+            supports_tool_calling=False,
+            supports_response_format=False,
+        )
+
+    if provider == "minimax":
+        return build_openai_compatible_llm(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url or "https://api.minimax.chat/v1",
+            temperature=0.1,
+            supports_tool_calling=False,
+            supports_response_format=False,
+        )
+
+    if provider == "kimi":
+        return build_openai_compatible_llm(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url or "https://api.moonshot.cn/v1",
+            temperature=0.1,
+            supports_tool_calling=True,
+            supports_response_format=False,
         )
 
     if provider == "ollama":

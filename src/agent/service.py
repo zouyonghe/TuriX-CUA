@@ -84,7 +84,34 @@ def screenshot_to_dataurl(screenshot):
     base64_encoded = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
     return f'data:image/png;base64,{base64_encoded}'
 
-def to_structured(llm: BaseChatModel, Schema, Structured_Output) -> BaseChatModel:
+def _llm_identity_text(llm: Optional[BaseChatModel]) -> str:
+    if llm is None:
+        return ""
+    parts = [
+        llm.__class__.__name__,
+        getattr(llm, "model_name", ""),
+        getattr(llm, "model", ""),
+        getattr(llm, "openai_api_base", ""),
+        getattr(llm, "base_url", ""),
+    ]
+    return " ".join(str(part).lower() for part in parts if part)
+
+
+def llm_supports_response_format(llm: Optional[BaseChatModel]) -> bool:
+    if llm is None:
+        return False
+    explicit = getattr(llm, "_turix_supports_response_format", None)
+    if explicit is not None:
+        return bool(explicit)
+
+    if isinstance(llm, (ChatOpenAI, AzureChatOpenAI)):
+        identity = _llm_identity_text(llm)
+        unsupported_tokens = ("deepseek", "minimax", "m2.5", "moonshot", "kimi")
+        return not any(token in identity for token in unsupported_tokens)
+    return True
+
+
+def to_structured(llm: Optional[BaseChatModel], Schema, Structured_Output) -> Optional[BaseChatModel]:
     """
     Wrap *any* LangChain chat model with the right structured-output mechanism:
 
@@ -101,6 +128,12 @@ def to_structured(llm: BaseChatModel, Schema, Structured_Output) -> BaseChatMode
     OLLAMA_CLASSES: tuple[Type[BaseChatModel], ...] = (ChatOllama,)
 
     if isinstance(llm, OPENAI_CLASSES):
+        if not llm_supports_response_format(llm):
+            logger.info(
+                "Structured response_format is disabled for model '%s'; falling back to prompt-only JSON.",
+                getattr(llm, "model_name", getattr(llm, "model", "unknown")),
+            )
+            return llm
         # OpenAI only: use the response_format param with your flattened schema
         return llm.bind(response_format=Schema)
 

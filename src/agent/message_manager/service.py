@@ -36,6 +36,7 @@ class MessageManager:
 		max_error_length: int = 400,
 		max_actions_per_step: int = 5,
 		give_task: bool = False,
+		use_tool_messages: Optional[bool] = None,
 	):
 		self.llm = llm
 		self.system_prompt_class = system_prompt_class
@@ -48,6 +49,10 @@ class MessageManager:
 		self.include_attributes = include_attributes
 		self.max_error_length = max_error_length
 		self.give_task = give_task
+		if use_tool_messages is None:
+			self.use_tool_messages = self._supports_tool_messages(llm)
+		else:
+			self.use_tool_messages = use_tool_messages
 
 		# Use the updated SystemPrompt with our explicit JSON instructions.
 		system_message = self.system_prompt_class(
@@ -62,36 +67,59 @@ class MessageManager:
 		if self.give_task:
 			self._add_message_with_tokens(task_message)
 		self.tool_id = 1
-		tool_calls = [
-			{
-				'name': 'AgentOutput',
-				'args': {
-					'current_state': {
-						'evaluation_previous_goal': 'Unknown - No previous actions to evaluate.',
-						'memory': 'Unknown - No previous actions to memorize.',
-						'next_goal': 'Get user task',
-						'reasoning': 'Unknown - Waiting for next goal',
-						'information_stored': '',
-						'improvement_proposal': ''
+		if self.use_tool_messages:
+			tool_calls = [
+				{
+					'name': 'AgentOutput',
+					'args': {
+						'current_state': {
+							'evaluation_previous_goal': 'Unknown - No previous actions to evaluate.',
+							'memory': 'Unknown - No previous actions to memorize.',
+							'next_goal': 'Get user task',
+							'reasoning': 'Unknown - Waiting for next goal',
+							'information_stored': '',
+							'improvement_proposal': ''
+						},
+						'action': [],
 					},
-					'action': [],
-				},
-				'id': str(self.tool_id),
-				'type': 'tool_call',
-			}
-		]
+					'id': str(self.tool_id),
+					'type': 'tool_call',
+				}
+			]
 
-		example_tool_call = AIMessage(
-			content="",
-			tool_calls=tool_calls
+			example_tool_call = AIMessage(
+				content="",
+				tool_calls=tool_calls
+			)
+			self._add_message_with_tokens(example_tool_call)
+			tool_message = ToolMessage(
+				content='macOS automation session started',
+				tool_call_id=str(self.tool_id),
+			)
+			self._add_message_with_tokens(tool_message)
+			self.tool_id += 1
+		else:
+			logger.info("Tool-call message history disabled for model '%s'.", getattr(llm, 'model_name', getattr(llm, 'model', llm.__class__.__name__)))
+
+		self.min_history_messages = len(self.history.messages)
+
+	def _supports_tool_messages(self, llm: BaseChatModel) -> bool:
+		explicit = getattr(llm, "_turix_supports_tool_calling", None)
+		if explicit is not None:
+			return bool(explicit)
+		identity = " ".join(
+			str(part).lower()
+			for part in [
+				llm.__class__.__name__,
+				getattr(llm, "model_name", ""),
+				getattr(llm, "model", ""),
+				getattr(llm, "openai_api_base", ""),
+				getattr(llm, "base_url", ""),
+			]
+			if part
 		)
-		self._add_message_with_tokens(example_tool_call)
-		tool_message = ToolMessage(
-			content='macOS automation session started',
-			tool_call_id=str(self.tool_id),
-		)
-		self._add_message_with_tokens(tool_message)
-		self.tool_id += 1
+		unsupported_tokens = ("deepseek", "minimax", "m2.5")
+		return not any(token in identity for token in unsupported_tokens)
 
 
 	def add_state_message(
@@ -123,14 +151,21 @@ class MessageManager:
 		self._add_message_with_tokens(state_message)
 
 	def _remove_last_state_message(self) -> None:
-		while len(self.history.messages) > 2 and isinstance(self.history.messages[-1].message, HumanMessage):
+		while len(self.history.messages) > self.min_history_messages and isinstance(self.history.messages[-1].message, HumanMessage):
 			self.history.remove_message()
 	def _remove_last_AIntool_message(self) -> None:
-		while len(self.history.messages) > 2 and (isinstance(self.history.messages[-1].message, AIMessage) or isinstance(self.history.messages[-1].message, ToolMessage)):
+		while len(self.history.messages) > self.min_history_messages and (isinstance(self.history.messages[-1].message, AIMessage) or isinstance(self.history.messages[-1].message, ToolMessage)):
 			self.history.remove_message()
 
 
 	def add_model_output(self, model_output: AgentOutput) -> None:
+		if not self.use_tool_messages:
+			msg = AIMessage(
+				content=model_output.model_dump_json(exclude_unset=True),
+			)
+			self._add_message_with_tokens(msg)
+			return
+
 		tool_calls = [
 			{
 				'name': 'AgentOutput',
