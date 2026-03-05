@@ -65,6 +65,43 @@ def screenshot_to_dataurl(screenshot):
     base64_encoded = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
     return f'data:image/png;base64,{base64_encoded}'
 
+
+def downscale_screenshot_by_tier(screenshot):
+    """
+    Apply tiered screenshot downscaling:
+    - 720p/1080p: keep original
+    - 2K/4K (and >2200px, <8K): divide width/height by 2
+    - 8K/16K: divide width/height by 4
+    """
+    width, height = screenshot.size
+    max_dim = max(width, height)
+    scale_factor = 1
+
+    if max_dim >= 7680:
+        scale_factor = 4
+    elif max_dim > 2200:
+        scale_factor = 2
+
+    if scale_factor == 1:
+        return screenshot
+
+    target_size = (max(1, width // scale_factor), max(1, height // scale_factor))
+    if hasattr(Image, 'Resampling'):
+        resample = Image.Resampling.LANCZOS
+    else:
+        resample = Image.LANCZOS
+    resized = screenshot.resize(target_size, resample=resample)
+    logger.debug(
+        'Downscaled screenshot from %sx%s to %sx%s (scale factor: %s)',
+        width,
+        height,
+        resized.width,
+        resized.height,
+        scale_factor,
+    )
+    return resized
+
+
 def to_structured(llm: BaseChatModel, Schema, Structured_Output) -> BaseChatModel:
     """
     Wrap *any* LangChain chat model with the right structured-output mechanism:
@@ -273,6 +310,7 @@ class Agent:
             self.save_memory()
             if self.n_steps >= 2:
                 annotated_screenshot = pyautogui.screenshot()
+                annotated_screenshot = downscale_screenshot_by_tier(annotated_screenshot)
                 screenshot_filename = f'images/screenshot_{self.n_steps}.png'
                 annotated_screenshot.save(screenshot_filename) 
                 self.screenshot_annotated = annotated_screenshot
@@ -293,6 +331,7 @@ class Agent:
                 ]
             else:
                 screenshot = pyautogui.screenshot()
+                screenshot = downscale_screenshot_by_tier(screenshot)
                 self.screenshot_annotated = screenshot
                 screenshot.save(f'images/screenshot_{self.n_steps}.png')
                 state_text = "The screenshot is provided."
