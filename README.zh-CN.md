@@ -39,6 +39,7 @@ TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
 - [🚀 快速开始（Windows 11）](#quickstart-windows)
    - [1. 下载应用](#download-app)
    - [2. 创建 Python 3.12 环境](#create-python-env)
+   - [Linux 系统依赖](#linux-prerequisites)
    - [3. 配置并运行](#configure-run)
    - [3.4 Skills（可选）](#skills-optional)
 - [🤝 贡献指南](#contributing)
@@ -136,6 +137,25 @@ conda create -n turix_env python=3.12
 conda activate turix_env        # requires conda ≥ 22.9
 pip install -r requirements.txt
 ```
+
+### <a id="linux-prerequisites"></a>Linux 系统依赖
+
+如果你在 Linux（X11 桌面会话）运行这个分支，请先安装以下系统包：
+
+```bash
+sudo apt update
+sudo apt install -y \
+  xclip xdotool wmctrl x11-utils x11-xserver-utils xdg-utils \
+  libglib2.0-bin libgtk-3-bin scrot python3-tk
+```
+
+说明：
+- `xclip`：`pyperclip` 使用的剪贴板后端。
+- `xdotool`、`wmctrl`：键盘输入/窗口激活与窗口控制。
+- `x11-utils`、`x11-xserver-utils`：提供 `xprop`、`xrandr`。
+- `libglib2.0-bin`、`libgtk-3-bin`、`xdg-utils`：提供 `gio`、`gtk-launch`、`xdg-open`。
+- `scrot`：Linux 下 `pyautogui` 的截图后端。
+- 当前分支的 Linux 实现以 X11 会话为主。
 
 ### <a id="configure-run"></a>3. 配置并运行
 

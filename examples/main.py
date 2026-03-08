@@ -51,6 +51,7 @@ LOG_LEVEL_MAP = {
 HOTKEY_ALIASES = {
     "command": "<cmd>",
     "cmd": "<cmd>",
+    "super": "<cmd>",
     "shift": "<shift>",
     "control": "<ctrl>",
     "ctrl": "<ctrl>",
@@ -238,9 +239,8 @@ def setup_logging(logging_level: str):
 # ---------- Main ------------------------------------------------------------
 def main(config_path: str = "config.json"):
     """Main function to run the agent."""
-    # Check if running on Windows
-    if platform.system() != "Windows":
-        print("This script is designed for Windows only.")
+    if platform.system() not in {"Windows", "Linux"}:
+        print("This script currently supports Windows and Linux.")
         sys.exit(1)
 
     # Make config path relative to script location if it's a relative path
@@ -274,6 +274,10 @@ def main(config_path: str = "config.json"):
     memory_llm = build_llm(cfg["memory_llm"])
     planner_llm = build_llm(cfg["planner_llm"]) if use_plan else None
     agent_cfg = cfg["agent"]
+    target_screen = agent_cfg.get("target_screen")
+    if target_screen is not None:
+        os.environ["TURIX_TARGET_SCREEN"] = str(target_screen)
+        log.info("Target screen set to: %s", os.environ["TURIX_TARGET_SCREEN"])
     skills_dir = agent_cfg.get("skills_dir")
     if skills_dir:
         skills_dir_path = Path(skills_dir)
@@ -351,7 +355,7 @@ def main(config_path: str = "config.json"):
 
 # ---------- CLI -------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the TuriX agent on Windows.")
+    parser = argparse.ArgumentParser(description="Run the TuriX desktop agent.")
     parser.add_argument(
         "-c", "--config", default="config.json", 
         help="Path to configuration JSON file"

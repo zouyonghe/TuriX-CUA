@@ -37,6 +37,7 @@ Prefer your own model? **Change in `config.json` and go.**
 - [🚀 Quick‑Start (Windows)](#-quickstart-windows)
    - [1. Download the App](#1-download-the-app)
    - [2. Create a Python 3.12 Environment](#2-create-a-python-312-environment)
+   - [Linux System Prerequisites](#linux-system-prerequisites)
    - [3. Configure & Run](#3-configure--run)
    - [3.4 Skills (Optional)](#34-skills-optional)
 - [🤝 Contributing](#-contributing)
@@ -133,6 +134,25 @@ conda create -n turix_env python=3.12
 conda activate turix_env        # requires conda ≥ 22.9
 pip install -r requirements.txt
 ```
+
+### Linux System Prerequisites
+
+If you run this branch on Linux (X11 desktop), install these system packages first:
+
+```bash
+sudo apt update
+sudo apt install -y \
+  xclip xdotool wmctrl x11-utils x11-xserver-utils xdg-utils \
+  libglib2.0-bin libgtk-3-bin scrot python3-tk
+```
+
+Notes:
+- `xclip`: clipboard backend used by `pyperclip`.
+- `xdotool` and `wmctrl`: keyboard/window activation and window control.
+- `x11-utils` and `x11-xserver-utils`: provide `xprop` and `xrandr`.
+- `libglib2.0-bin`, `libgtk-3-bin`, `xdg-utils`: provide `gio`, `gtk-launch`, `xdg-open`.
+- `scrot`: screenshot backend used by `pyautogui` on Linux.
+- Current Linux implementation in this branch targets X11 sessions.
 
 ### 3. Configure & Run
 

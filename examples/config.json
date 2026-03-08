@@ -43,6 +43,7 @@
     "use_plan": true,
     "max_actions_per_step": 5,
     "max_steps": 100,
+    "target_screen": 1,
     "force_stop_hotkey": "ctrl+shift+2",
     "resume": false,
     "agent_id": null,

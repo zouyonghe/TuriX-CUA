@@ -18,8 +18,7 @@ from src.controller.views import (
 	RecordAction,
 )
 from src.utils import time_execution_async, time_execution_sync
-from src.windows.openapp import open_application_by_name
-from src.windows.actions import WindowsActions
+from src.platform_adapter import PlatformActions, open_application_by_name
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +29,11 @@ class Controller:
 	):
 		self.exclude_actions = exclude_actions
 		self.registry = Registry(exclude_actions)
-		self.win = WindowsActions()
+		self.win = PlatformActions()
 		self._register_default_actions()
 
 	def _register_default_actions(self):
-		"""Register all default Windows UI actions"""
+		"""Register all default desktop UI actions"""
 
 		@self.registry.action(
 				'Complete task',
@@ -58,26 +57,26 @@ class Controller:
 				return ActionResult(extracted_content=msg, error=msg)
 
 
-		@self.registry.action("Open a Windows app", param_model=OpenAppAction)
+		@self.registry.action("Open an app", param_model=OpenAppAction)
 		async def open_app(app_name: str):
 			"""
-			Attempt to open a Windows app by name.
+			Attempt to open an app by name.
 			"""
 
 			user_input = app_name
 			if user_input.lower() == 'wechat':
 				user_input = '微信'
-			success, _ = await open_application_by_name(user_input)
+			success, detail = await open_application_by_name(user_input)
 			logger.info(f"\nLaunching app: {user_input}...")			
 			if not success:
-				msg = f"❌ Failed to launch '{user_input}'"
+				msg = f"❌ Failed to launch '{user_input}': {detail}"
 				logger.error(msg)
 				return ActionResult(extracted_content=msg, error=msg)
 
 		
 			pid = None
 
-			success_msg = f"✅ Launched {user_input}, PID={pid}"
+			success_msg = f"✅ Launched {user_input}. detail={detail}"
 			logger.info(success_msg)
 			return ActionResult(extracted_content=success_msg, current_app_pid=pid)
 		
@@ -109,7 +108,7 @@ class Controller:
 				key3 = clean_key(key3)
 			key_map = {
 				'cmd': 'ctrl',
-				'delete': 'backspace'
+				'super': 'ctrl',
 			}
 			# 映射键名
 			def map_key(key: str) -> str:

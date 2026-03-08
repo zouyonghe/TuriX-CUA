@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+import platform
 from pathlib import Path
 import re
 from datetime import datetime
@@ -59,6 +60,11 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 TASK_ID_MAX_LEN = 60
+
+if platform.system() == "Linux":
+    from src.linux.screen import get_target_screen_rect
+else:
+    get_target_screen_rect = None
 
 
 def _task_to_slug(task: str, max_len: int = TASK_ID_MAX_LEN) -> str:
@@ -568,7 +574,11 @@ class Agent:
         prev_step_id = step_id - 1
         try:
             self.previous_screenshot = self.screenshot_annotated
-            screenshot = pyautogui.screenshot()
+            if get_target_screen_rect is not None:
+                x, y, w, h = get_target_screen_rect()
+                screenshot = pyautogui.screenshot(region=(x, y, w, h))
+            else:
+                screenshot = pyautogui.screenshot()
             screenshot = downscale_screenshot_by_tier(screenshot)
             self.screenshot_annotated = screenshot
             os.makedirs(self.images_dir, exist_ok=True)

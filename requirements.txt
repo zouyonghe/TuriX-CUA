@@ -1,38 +1,30 @@
-# Core dependencies
-asyncio
-typing
+# Core runtime
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+openai>=1.0.0
 
-# Image processing
-Pillow>=10.0.0
-numpy>=1.24.0
-
-# GUI automation
-pyautogui>=0.9.54
-pynput>=1.7.6
-
-# Windows-specific packages
-pywin32>=306
-psutil>=5.9.0
-
-# Fuzzy string matching
-rapidfuzz>=3.0.0
-fuzzywuzzy>=0.18.0
-
-# AI/ML packages
-langchain-anthropic>=0.1.0
+# Agent/model providers
+langchain-core>=0.1.0
 langchain-openai>=0.1.0
 langchain-google-genai>=1.0.0
+langchain-anthropic>=0.1.0
 langchain-ollama>=0.2.2
-langchain-core>=0.1.0
-pydantic>=2.0.0
 ddgs>=6.1.0
 
-# Cloud storage (if needed)
+# Desktop automation and imaging
+pyautogui>=0.9.54
+pyperclip>=1.9.0
+pynput>=1.7.6
+Pillow>=10.0.0
+rapidfuzz>=3.0.0
+
+# Optional cloud storage helper
 oss2>=2.17.0
 
-# Other utilities
-portkey-ai>=1.0.0
+# Windows-specific runtime
+pywin32>=306; platform_system == "Windows"
+psutil>=5.9.0; platform_system == "Windows"
 
-# Development dependencies (optional)
+# Notebook/dev (optional)
 ipykernel>=6.25.0
 jupyter>=1.0.0

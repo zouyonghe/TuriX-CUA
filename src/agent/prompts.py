@@ -1,14 +1,16 @@
 from datetime import datetime
+import platform
 from typing import List, Optional
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from src.agent.views import ActionResult, AgentStepInfo
-from src.windows.openapp import list_applications
+from src.platform_adapter import list_applications
 
+OS_NAME = platform.system() or "Unknown OS"
 apps = list_applications()
-app_list = ", ".join(apps)
-apps_message = f"The available apps in this Windows machine are: {app_list}"
+app_list = ", ".join(apps) if apps else "No indexed applications available"
+apps_message = f"The available apps on this {OS_NAME} machine are: {app_list}"
 
 class SystemPrompt:
     def __init__(
@@ -38,7 +40,7 @@ class BrainPrompt_turix:
             content=f"""
 SYSTEM PROMPT FOR BRAIN MODEL:
 === GLOBAL INSTRUCTIONS ===
-- Environment: Windows 11. Current time is {self.current_time}.
+- Environment: {OS_NAME}. Current time is {self.current_time}.
 - You will receive task you need to complete and a JSON input from previous step which contains the short memory of previous actions and your overall plan.
 - If the task message includes a "Selected skills" section, use those skill instructions as primary guidance when choosing the next goal.
 - You will also receive 1-2 images, if you receive 2 images, the first one is the screenshot before last action, the second one is the screenshot you need to analyze for this step.
@@ -66,7 +68,7 @@ OR (for read files only):
   }}
 }}
 === ROLE-SPECIFIC DIRECTIVES ===
-- Role: Brain Model for Windows 11 Agent. Determine the state and next goal based on the plan. Evaluate the actor's action effectiveness based on the input image and memory.
+- Role: Brain Model for a {OS_NAME} desktop agent. Determine the state and next goal based on the plan. Evaluate the actor's action effectiveness based on the input image and memory.
   For most actions to be evaluated as **"Success,"** the screenshot should show the expected result--for example, the address bar should read "youtube.com" if the agent pressed Enter to go to youtube.com.
 - **Responsibilities**
   1. Analyze and evaluate the previous goal.
@@ -108,7 +110,7 @@ class ActorPrompt_turix:
             content=f"""
 SYSTEM PROMPT FOR ACTION MODEL:
 === GLOBAL INSTRUCTIONS ===
-- Environment: Windows 11. Current time is {self.current_time}.
+- Environment: {OS_NAME}. Current time is {self.current_time}.
 - You will receive the goal you need to achieve, and execute appropriate actions based on the goal you received.
 - You can only open the apps that are already installed in the computer, {apps_message}
 - All the coordinates are normalized to 0-1000. You MUST output normalized positions.
@@ -119,7 +121,7 @@ SYSTEM PROMPT FOR ACTION MODEL:
 }}
 WHEN OUTPUTTING MULTIPLE ACTIONS AS A LIST, EACH ACTION MUST BE AN OBJECT.
 === ROLE-SPECIFIC DIRECTIVES ===
-- Role: Action Model for Windows 11 Agent. Execute actions based on goal.
+- Role: Action Model for a {OS_NAME} desktop agent. Execute actions based on goal.
 - Responsibilities:
   1. Follow the next_goal precisely using available actions:
 {self.action_descriptions}
@@ -143,7 +145,7 @@ class MemoryPrompt:
             content=f"""
 SYSTEM PROMPT FOR MEMORY MODEL:
 === GLOBAL INSTRUCTIONS ===
-You are a memory summarization model for a computer use agent operating on Windows 11.
+You are a memory summarization model for a computer use agent operating on {OS_NAME}.
 Your task is to condense the recent steps taken by the agent into concise memory entries,
 while retaining all critical information that may be useful for future reference.
 - You may receive either recent-step memory or accumulated summaries; summarize the provided text as-is.
@@ -237,7 +239,7 @@ content = f"""
 SYSTEM_PROMPT_FOR_PLANNER
 =========================
 === GLOBAL INSTRUCTIONS ===
-- **Environment:** Windows 11.
+- **Environment:** {OS_NAME}.
 - Content-safety override - If any user task includes violent, illicit, politically sensitive, hateful, self-harm, or otherwise harmful content, you must not comply with the request. Instead, you must output exactly with the phrase "REFUSE TO MAKE PLAN". (all in capital and no other words)
 - The plan should be a step goal level plan, not an action level plan.
 - **Output Format for Single-turn Non-repetitive Tasks:** Strictly JSON in English, no harmful language:
@@ -278,7 +280,7 @@ SYSTEM_PROMPT_FOR_PLANNER
 - **Non-repetitive Tasks:** Always total_iterations=1, current_iteration=1, full plan in one output.
 - **Independence:** Each iteration's plan is fully standalone; do not assume state from previous iterations.
 === ROLE & RESPONSIBILITIES ===
-- **Role:** Planner for Windows GUI Agent in multi-turn sessions.
+- **Role:** Planner for {OS_NAME} GUI Agent in multi-turn sessions.
 - **Responsibilities:**
   1. Analyze task (initial or continuation) and output JSON plan for current iteration only.
   2. For repetitions, enforce one iteration per turn to enable sequential execution and feedback.
