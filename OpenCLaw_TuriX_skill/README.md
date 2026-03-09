@@ -61,3 +61,7 @@ Dry run:
 ```bash
 scripts/run_turix.sh --dry-run "Open Finder"
 ```
+
+Force stop hotkey:
+
+- Press `Cmd+Shift+2` to immediately terminate the running TuriX agent.

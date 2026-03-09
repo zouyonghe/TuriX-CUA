@@ -298,6 +298,7 @@ main() {
     preflight_checks
 
     log_info "Starting TuriX mac_legacy..."
+    log_info "Press Cmd+Shift+2 to force stop"
     "$CONDA_PATH" run -n "$ENV_NAME" python examples/main.py
 }
 

@@ -1,6 +1,7 @@
 import os, sys, json, logging, argparse, asyncio, ctypes
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from pynput import keyboard
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
@@ -29,11 +30,73 @@ LOG_LEVEL_MAP = {
     "DEBUG":    logging.DEBUG,
 }
 
+HOTKEY_ALIASES = {
+    "command": "<cmd>",
+    "cmd": "<cmd>",
+    "shift": "<shift>",
+    "control": "<ctrl>",
+    "ctrl": "<ctrl>",
+    "option": "<alt>",
+    "alt": "<alt>",
+    "opt": "<alt>",
+}
+
 def load_config(path: Path) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Config file {path} not found.")
     with path.open("r", encoding="utf-8") as fp:
         return json.load(fp)
+
+def normalize_hotkey(hotkey: str) -> str:
+    if not hotkey:
+        return ""
+    parts = [p for p in hotkey.replace(" ", "").split("+") if p]
+    normalized = []
+    for part in parts:
+        token = part.strip().lower()
+        if token in HOTKEY_ALIASES:
+            normalized.append(HOTKEY_ALIASES[token])
+        elif token.startswith("<") and token.endswith(">"):
+            normalized.append(token)
+        else:
+            normalized.append(token)
+    return "+".join(normalized)
+
+def request_agent_force_stop(agent: Agent, log: logging.Logger):
+    """
+    Compatible force-stop path for both newer and legacy Agent implementations.
+    """
+    stop_fn = getattr(agent, "stop", None)
+    if callable(stop_fn):
+        try:
+            stop_fn("force-stop hotkey")
+        except TypeError:
+            stop_fn()
+        return
+
+    if hasattr(agent, "_stopped"):
+        setattr(agent, "_stopped", True)
+        log.warning("Force-stop fallback used: set agent._stopped=True")
+
+def register_force_stop_hotkey(
+    loop: asyncio.AbstractEventLoop,
+    agent: Agent,
+    agent_task: asyncio.Task,
+    hotkey: str,
+    log: logging.Logger,
+):
+    def _force_stop():
+        log.warning("Force-stop hotkey pressed. Stopping agent now.")
+        request_agent_force_stop(agent, log)
+        if not agent_task.done():
+            agent_task.cancel()
+
+    def _on_activate():
+        loop.call_soon_threadsafe(_force_stop)
+
+    listener = keyboard.GlobalHotKeys({hotkey: _on_activate})
+    listener.start()
+    return listener
 
 def build_llm(cfg: dict):
     provider = cfg["provider"].lower()
@@ -122,6 +185,8 @@ def main(config_path: str = "config.json"):
 
     # --- Build LLM & Agent --------------------------------------------------
     agent_cfg = cfg["agent"]
+    raw_hotkey = agent_cfg.get("force_stop_hotkey", "command+shift+2")
+    force_stop_hotkey = normalize_hotkey(raw_hotkey)
     llm = build_llm(cfg["llm"])
     use_planner = agent_cfg.get("use_planner", True)
     planner_llm = build_llm(cfg["planner_llm"]) if use_planner else None
@@ -152,7 +217,24 @@ def main(config_path: str = "config.json"):
     )
 
     async def runner():
-        await agent.run(max_steps=agent_cfg.get("max_steps", 100))
+        loop = asyncio.get_running_loop()
+        agent_task = asyncio.create_task(agent.run(max_steps=agent_cfg.get("max_steps", 100)))
+        listener = None
+
+        if force_stop_hotkey:
+            try:
+                listener = register_force_stop_hotkey(loop, agent, agent_task, force_stop_hotkey, log)
+                log.info("Force-stop hotkey registered: %s", force_stop_hotkey)
+            except Exception:
+                log.exception("Failed to register force-stop hotkey: %s", raw_hotkey)
+
+        try:
+            await agent_task
+        except asyncio.CancelledError:
+            log.warning("Agent task cancelled.")
+        finally:
+            if listener:
+                listener.stop()
 
     asyncio.run(runner())
 

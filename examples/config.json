@@ -28,6 +28,7 @@
     "use_planner": false,
     "max_actions_per_step": 5,
     "max_steps": 100,
+    "force_stop_hotkey": "command+shift+2",
     "memory_budget": 500,
     "summary_memory_budget": 2000,
     "use_turix": true,

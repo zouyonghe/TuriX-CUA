@@ -50,6 +50,11 @@ skills/local/turix-mac-fast/scripts/run_turix.sh --enable-planner "Finish a long
 skills/local/turix-mac-fast/scripts/run_turix.sh --dry-run "Open Finder"
 ```
 
+## Force Stop Hotkey
+
+- Press `Cmd+Shift+2` to force-stop the running agent.
+- Default config key is `agent.force_stop_hotkey: "command+shift+2"`.
+
 ## Notes
 
 - Fast mode defaults to `use_planner: false`.
