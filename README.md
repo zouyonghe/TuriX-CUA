@@ -29,6 +29,7 @@ Prefer your own model? **Change in `config.json` and go.**
 
 ## Table of Contents
 - [📞 Contact & Community](#-contact--community)
+- [🤖 OpenClaw Skill](#-openclaw-skill)
 - [📰 Latest News](#-latest-news)
 - [🖼️ Demos](#️-demos)
 - [✨ Key Features](#-key-features)
@@ -42,6 +43,16 @@ Prefer your own model? **Change in `config.json` and go.**
    - [4. Configure & Run](#4-configure--run)
 - [🤝 Contributing](#-contributing)
 - [🗺️ Roadmap](#️-roadmap)
+
+---
+
+## 🤖 OpenClaw Skill
+
+This branch includes a local OpenClaw skill package for macOS fast mode in `OpenCLaw_TuriX_skill/` (`SKILL.md` + `scripts/run_turix.sh`).
+
+Copy it into your OpenClaw local skills folder (for example: `clawd/skills/local/turix-mac-fast/`) and follow `OpenCLaw_TuriX_skill/README.md` for setup.
+
+This package is branch-safe for `mac_legacy` and uses the lighter single-model config path (`llm` + optional `use_planner`).
 
 ---
 

@@ -29,6 +29,7 @@ TuriX 让强大的 AI 模型能在你的桌面上真正动手操作。
 
 ## 目录
 - [📞 联系方式与社区](#contact-community)
+- [🤖 OpenClaw 技能](#openclaw-skill)
 - [📰 最新动态](#latest-news)
 - [🖼️ 演示](#demos)
 - [✨ 关键特性](#key-features)
@@ -42,6 +43,16 @@ TuriX 让强大的 AI 模型能在你的桌面上真正动手操作。
    - [4. 配置并运行](#configure-run)
 - [🤝 贡献指南](#contributing)
 - [🗺️ 开发规划](#roadmap)
+
+---
+
+## <a id="openclaw-skill"></a>🤖 OpenClaw 技能
+
+本分支已内置 macOS 快速模式的 OpenClaw 本地技能包，位于 `OpenCLaw_TuriX_skill/`（包含 `SKILL.md` 与 `scripts/run_turix.sh`）。
+
+将该目录复制到你的 OpenClaw 本地技能目录（例如：`clawd/skills/local/turix-mac-fast/`），并按 `OpenCLaw_TuriX_skill/README.md` 完成配置。
+
+该技能包针对 `mac_legacy` 分支做了安全检查，使用更轻量的单模型配置路径（`llm` + 可选 `use_planner`）。
 
 ---
 
