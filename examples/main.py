@@ -98,21 +98,55 @@ def register_force_stop_hotkey(
     listener.start()
     return listener
 
-def build_llm(cfg: dict):
+def build_llm(cfg: dict, enable_thinking: bool | None = None):
     provider = cfg["provider"].lower()
     api_key  = cfg.get("api_key") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
     model_name = cfg.get("model_name")
     base_url = cfg.get("base_url")
+    # Optional passthrough for OpenAI-compatible backends.
+    # Useful for disabling provider-specific "thinking/reasoning" modes.
+    model_kwargs = cfg.get("model_kwargs")
+    if not isinstance(model_kwargs, dict):
+        model_kwargs = {}
+    extra_body_merged = {}
+    existing_extra_body = cfg.get("extra_body")
+    if isinstance(existing_extra_body, dict) and existing_extra_body:
+        extra_body_merged.update(existing_extra_body)
+    chat_template_kwargs = cfg.get("chat_template_kwargs")
+    if isinstance(chat_template_kwargs, dict):
+        merged_chat_template_kwargs = dict(chat_template_kwargs)
+    else:
+        merged_chat_template_kwargs = {}
+    if enable_thinking is not None:
+        # Global switch: enforce the same thinking mode on all model configs.
+        merged_chat_template_kwargs["enable_thinking"] = bool(enable_thinking)
+    if merged_chat_template_kwargs:
+        extra_body_merged["chat_template_kwargs"] = merged_chat_template_kwargs
+    if extra_body_merged:
+        prebound_extra = model_kwargs.get("extra_body")
+        if isinstance(prebound_extra, dict):
+            merged = dict(prebound_extra)
+            merged.update(extra_body_merged)
+            model_kwargs["extra_body"] = merged
+        else:
+            model_kwargs["extra_body"] = extra_body_merged
 
     if provider == "turix":
         if not base_url:
             raise ValueError("OpenAI‑compatible provider requires 'base_url'.")
-        return ChatOpenAI(
+        kwargs = dict(
             model=model_name,
             openai_api_base=base_url,
             openai_api_key=api_key,
-            temperature=0.3,
+            temperature=cfg.get("temperature", 0.3),
         )
+        if model_kwargs:
+            kwargs["model_kwargs"] = model_kwargs
+        if cfg.get("max_tokens") is not None:
+            kwargs["max_tokens"] = cfg.get("max_tokens")
+        if cfg.get("timeout") is not None:
+            kwargs["timeout"] = cfg.get("timeout")
+        return ChatOpenAI(**kwargs)
 
     if provider == "ollama":
         if not model_name:
@@ -128,9 +162,16 @@ def build_llm(cfg: dict):
         )
     
     if provider == "gpt":
-        return ChatOpenAI(
+        kwargs = dict(
             model="gpt-4.1-mini", api_key=api_key, temperature=0.3
         )
+        if model_kwargs:
+            kwargs["model_kwargs"] = model_kwargs
+        if cfg.get("max_tokens") is not None:
+            kwargs["max_tokens"] = cfg.get("max_tokens")
+        if cfg.get("timeout") is not None:
+            kwargs["timeout"] = cfg.get("timeout")
+        return ChatOpenAI(**kwargs)
 
     if provider == "google_pro":
         return ChatGoogleGenerativeAI(
@@ -161,11 +202,16 @@ def main(config_path: str = "config.json"):
         handlers=[
             logging.StreamHandler(),  # Console output
             RotatingFileHandler("logging.log", maxBytes=20 * 1024 * 1024, backupCount=3)
-        ]
+        ],
+        force=True,
     )
     
     # Set up specific logger
     log = logging.getLogger("turix")
+    # src/__init__.py calls setup_logging() during import and may leave turix logger
+    # detached from root handlers; reset so file handler receives turix logs too.
+    log.handlers.clear()
+    log.propagate = True
     log.setLevel(logging_level)
     
     # Also set logging for other relevant modules
@@ -187,11 +233,17 @@ def main(config_path: str = "config.json"):
     agent_cfg = cfg["agent"]
     raw_hotkey = agent_cfg.get("force_stop_hotkey", "command+shift+2")
     force_stop_hotkey = normalize_hotkey(raw_hotkey)
-    llm = build_llm(cfg["llm"])
+    global_enable_thinking = cfg.get("enable_thinking")
+    if isinstance(global_enable_thinking, bool):
+        enable_thinking = global_enable_thinking
+    else:
+        enable_thinking = None
+
+    llm = build_llm(cfg["llm"], enable_thinking=enable_thinking)
     use_planner = agent_cfg.get("use_planner", True)
-    planner_llm = build_llm(cfg["planner_llm"]) if use_planner else None
+    planner_llm = build_llm(cfg["planner_llm"], enable_thinking=enable_thinking) if use_planner else None
     memory_llm_cfg = cfg.get("memory_llm")
-    memory_llm = build_llm(memory_llm_cfg) if memory_llm_cfg else None
+    memory_llm = build_llm(memory_llm_cfg, enable_thinking=enable_thinking) if memory_llm_cfg else None
     controller = Controller()
     save_llm_conversation_path = agent_cfg.get("save_llm_conversation_path")
     save_llm_conversation_path_encoding = agent_cfg.get(
