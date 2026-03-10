@@ -173,23 +173,69 @@ def cleanup_previous_runs(working_dir_base: str):
             except Exception as e:
                 print(f"Error deleting {file}: {e}")
 
-def build_llm(cfg: dict):
+def _merge_model_kwargs(cfg: dict, enable_thinking: bool | None = None) -> dict:
+    model_kwargs = cfg.get("model_kwargs")
+    if not isinstance(model_kwargs, dict):
+        model_kwargs = {}
+    else:
+        model_kwargs = dict(model_kwargs)
+
+    extra_body_merged = {}
+    existing_extra_body = cfg.get("extra_body")
+    if isinstance(existing_extra_body, dict) and existing_extra_body:
+        extra_body_merged.update(existing_extra_body)
+
+    chat_template_kwargs = cfg.get("chat_template_kwargs")
+    if isinstance(chat_template_kwargs, dict):
+        merged_chat_template_kwargs = dict(chat_template_kwargs)
+    else:
+        merged_chat_template_kwargs = {}
+
+    if enable_thinking is not None:
+        merged_chat_template_kwargs["enable_thinking"] = bool(enable_thinking)
+
+    if merged_chat_template_kwargs:
+        extra_body_merged["chat_template_kwargs"] = merged_chat_template_kwargs
+
+    if extra_body_merged:
+        prebound_extra = model_kwargs.get("extra_body")
+        if isinstance(prebound_extra, dict):
+            merged_extra = dict(prebound_extra)
+            merged_extra.update(extra_body_merged)
+            model_kwargs["extra_body"] = merged_extra
+        else:
+            model_kwargs["extra_body"] = extra_body_merged
+
+    return model_kwargs
+
+
+def build_llm(cfg: dict, *, enable_thinking: bool | None = None):
     """Build LLM based on configuration."""
     provider = cfg["provider"].lower()
     api_key = cfg.get("api_key") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
     base_url = cfg.get("base_url")
     model = cfg.get("model_name", "turix-model")
-    temperature = 0.1
+    temperature = cfg.get("temperature", 0.1)
+    model_kwargs = _merge_model_kwargs(cfg, enable_thinking=enable_thinking)
+    max_tokens = cfg.get("max_tokens")
+    timeout = cfg.get("timeout")
 
     if provider == "turix":
         if not base_url:
             raise ValueError("Turix provider requires 'base_url'.")
-        return ChatOpenAI(
+        kwargs = dict(
             model=model,
             openai_api_base=base_url,
             openai_api_key=api_key,
             temperature=temperature,
         )
+        if model_kwargs:
+            kwargs["model_kwargs"] = model_kwargs
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return ChatOpenAI(**kwargs)
 
     elif provider == "google_pro_stable":
         return ChatGoogleGenerativeAI(
@@ -206,11 +252,18 @@ def build_llm(cfg: dict):
         )
     
     elif provider == "openai":
-        return ChatOpenAI(
+        kwargs = dict(
             model=model,
             api_key=api_key,
             temperature=temperature
         )
+        if model_kwargs:
+            kwargs["model_kwargs"] = model_kwargs
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return ChatOpenAI(**kwargs)
 
     elif provider == "anthropic":
         return ChatAnthropic(
@@ -249,6 +302,13 @@ def main(config_path: str = "config.json"):
     
     cfg = load_config(Path(config_path))
     output_dir = resolve_output_dir(cfg, Path(config_path))
+    brain_enable_thinking = cfg.get("brain_enable_thinking")
+    if not isinstance(brain_enable_thinking, bool):
+        thinking_cfg = cfg.get("thinking")
+        if isinstance(thinking_cfg, dict) and isinstance(thinking_cfg.get("brain"), bool):
+            brain_enable_thinking = thinking_cfg.get("brain")
+        else:
+            brain_enable_thinking = False
     
     # Update environment variable if different config was passed
     current_logging_level = cfg.get("logging_level", "INFO").lower()
@@ -258,7 +318,24 @@ def main(config_path: str = "config.json"):
 
     # --- Logging -----------------------------------------------------------
     setup_logging(cfg.get("logging_level", "DEBUG"))
+    log_level_str = cfg.get("logging_level", "DEBUG").upper()
+    logging_level = LOG_LEVEL_MAP.get(log_level_str, logging.DEBUG)
+    logging.basicConfig(
+        level=logging_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            RotatingFileHandler(str(output_dir / "logging.log"), maxBytes=20 * 1024 * 1024, backupCount=3),
+        ],
+        force=True,
+    )
     log = logging.getLogger("turix")
+    log.handlers.clear()
+    log.propagate = True
+    log.setLevel(logging_level)
+    logging.getLogger("src").setLevel(logging_level)
+    logging.getLogger("src.agent").setLevel(logging_level)
+    logging.getLogger("src.agent.message_manager").setLevel(logging_level)
 
     # --- Cleanup previous runs ---------------------------------------------
     if cfg.get("cleanup_previous_runs", True):
@@ -269,10 +346,17 @@ def main(config_path: str = "config.json"):
             pass
     # --- Build LLM & Agent --------------------------------------------------
     use_plan = cfg.get("agent", {}).get("use_plan", False)
-    brain_llm = build_llm(cfg["brain_llm"])
-    actor_llm = build_llm(cfg["actor_llm"])
-    memory_llm = build_llm(cfg["memory_llm"])
-    planner_llm = build_llm(cfg["planner_llm"]) if use_plan else None
+    brain_llm = build_llm(cfg["brain_llm"], enable_thinking=brain_enable_thinking)
+    actor_llm = build_llm(cfg["actor_llm"], enable_thinking=False)
+    memory_llm = build_llm(cfg["memory_llm"], enable_thinking=False)
+    planner_llm = build_llm(cfg["planner_llm"], enable_thinking=True) if use_plan else None
+    log.info(
+        "Thinking config => brain=%s, actor=%s, memory=%s, planner=%s",
+        brain_enable_thinking,
+        False,
+        False,
+        bool(use_plan),
+    )
     agent_cfg = cfg["agent"]
     target_screen = agent_cfg.get("target_screen")
     if target_screen is not None:

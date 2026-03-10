@@ -89,6 +89,33 @@ def screenshot_to_dataurl(screenshot):
     return f"data:image/png;base64,{base64_encoded}"
 
 
+def _llm_identity_text(llm: Optional[BaseChatModel]) -> str:
+    if llm is None:
+        return ""
+    parts = [
+        llm.__class__.__name__,
+        getattr(llm, "model_name", ""),
+        getattr(llm, "model", ""),
+        getattr(llm, "openai_api_base", ""),
+        getattr(llm, "base_url", ""),
+    ]
+    return " ".join(str(part).lower() for part in parts if part)
+
+
+def llm_supports_response_format(llm: Optional[BaseChatModel]) -> bool:
+    if llm is None:
+        return False
+    explicit = getattr(llm, "_turix_supports_response_format", None)
+    if explicit is not None:
+        return bool(explicit)
+
+    if isinstance(llm, (ChatOpenAI, AzureChatOpenAI)):
+        identity = _llm_identity_text(llm)
+        unsupported_tokens = ("deepseek", "minimax", "m2.5", "moonshot", "kimi")
+        return not any(token in identity for token in unsupported_tokens)
+    return True
+
+
 def downscale_screenshot_by_tier(screenshot):
     """
     Apply tiered screenshot downscaling:
@@ -125,7 +152,9 @@ def downscale_screenshot_by_tier(screenshot):
     return resized
 
 
-def to_structured(llm: BaseChatModel, Schema, Structured_Output) -> BaseChatModel:
+def to_structured(
+    llm: Optional[BaseChatModel], Schema, Structured_Output
+) -> Optional[BaseChatModel]:
     """
     Wrap any LangChain chat model with the right structured-output mechanism:
 
@@ -142,7 +171,34 @@ def to_structured(llm: BaseChatModel, Schema, Structured_Output) -> BaseChatMode
     OLLAMA_CLASSES: tuple[Type[BaseChatModel], ...] = (ChatOllama,)
 
     if isinstance(llm, OPENAI_CLASSES):
-        return llm.bind(response_format=Schema)
+        if not llm_supports_response_format(llm):
+            logger.info(
+                "Structured response_format is disabled for model '%s'; falling back to prompt-only JSON.",
+                getattr(llm, "model_name", getattr(llm, "model", "unknown")),
+            )
+            return llm
+
+        # OpenAI cloud endpoint expects flattened json_schema fields under response_format
+        # (type/name/schema/strict), while many OpenAI-compatible backends accept the nested
+        # {"type":"json_schema","json_schema":{...}} shape.
+        response_format = Schema
+        base_url = str(
+            getattr(llm, "openai_api_base", "") or getattr(llm, "base_url", "") or ""
+        ).lower()
+        is_openai_cloud = (not base_url) or ("api.openai.com" in base_url)
+        if is_openai_cloud and isinstance(Schema, dict):
+            schema_type = Schema.get("type")
+            json_schema = Schema.get("json_schema")
+            if schema_type == "json_schema" and isinstance(json_schema, dict):
+                flat = {"type": "json_schema"}
+                if json_schema.get("name"):
+                    flat["name"] = json_schema.get("name")
+                if json_schema.get("schema") is not None:
+                    flat["schema"] = json_schema.get("schema")
+                if json_schema.get("strict") is not None:
+                    flat["strict"] = json_schema.get("strict")
+                response_format = flat
+        return llm.bind(response_format=response_format)
 
     if isinstance(llm, ANTHROPIC_OR_GEMINI):
         return llm.with_structured_output(Structured_Output)
