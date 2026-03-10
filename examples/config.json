@@ -1,5 +1,6 @@
 {
   "logging_level": "DEBUG",
+  "enable_thinking": false,
 
   "llm": {
     "provider": "turix",

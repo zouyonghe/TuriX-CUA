@@ -117,8 +117,25 @@ def to_structured(llm: BaseChatModel, Schema, Structured_Output) -> BaseChatMode
     )
 
     if isinstance(llm, OPENAI_CLASSES):
-        # OpenAI only: use the response_format param with your flattened schema
-        return llm.bind(response_format=Schema)
+        # OpenAI cloud endpoint expects flattened json_schema fields under response_format
+        # (type/name/schema/strict), while some OpenAI-compatible backends accept the nested
+        # {"type":"json_schema","json_schema":{...}} shape.
+        response_format = Schema
+        base_url = str(getattr(llm, "openai_api_base", "") or getattr(llm, "base_url", "") or "").lower()
+        is_openai_cloud = (not base_url) or ("api.openai.com" in base_url)
+        if is_openai_cloud and isinstance(Schema, dict):
+            schema_type = Schema.get("type")
+            json_schema = Schema.get("json_schema")
+            if schema_type == "json_schema" and isinstance(json_schema, dict):
+                flat = {"type": "json_schema"}
+                if json_schema.get("name"):
+                    flat["name"] = json_schema.get("name")
+                if json_schema.get("schema") is not None:
+                    flat["schema"] = json_schema.get("schema")
+                if json_schema.get("strict") is not None:
+                    flat["strict"] = json_schema.get("strict")
+                response_format = flat
+        return llm.bind(response_format=response_format)
 
     if isinstance(llm, ANTHROPIC_OR_GEMINI):
         # Claude & Gemini accept any schema textually → keep the nice Pydantic model

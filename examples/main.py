@@ -102,17 +102,42 @@ def build_llm(cfg: dict):
     api_key = cfg.get("api_key") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
     base_url = cfg.get("base_url")
     model = cfg.get("model_name", "turix-model")
-    temperature = 0.3
+    temperature = cfg.get("temperature", 0.3)
+    model_kwargs = cfg.get("model_kwargs")
+    if not isinstance(model_kwargs, dict):
+        model_kwargs = {}
+    extra_body_merged = {}
+    existing_extra_body = cfg.get("extra_body")
+    if isinstance(existing_extra_body, dict) and existing_extra_body:
+        extra_body_merged.update(existing_extra_body)
+    chat_template_kwargs = cfg.get("chat_template_kwargs")
+    if isinstance(chat_template_kwargs, dict) and chat_template_kwargs:
+        extra_body_merged["chat_template_kwargs"] = dict(chat_template_kwargs)
+    if extra_body_merged:
+        prebound_extra = model_kwargs.get("extra_body")
+        if isinstance(prebound_extra, dict):
+            merged_extra = dict(prebound_extra)
+            merged_extra.update(extra_body_merged)
+            model_kwargs["extra_body"] = merged_extra
+        else:
+            model_kwargs["extra_body"] = extra_body_merged
 
     if provider == "turix":
         if not base_url:
             raise ValueError("Turix provider requires 'base_url'.")
-        return ChatOpenAI(
+        kwargs = dict(
             model=model,
             openai_api_base=base_url,
             openai_api_key=api_key,
             temperature=temperature,
         )
+        if model_kwargs:
+            kwargs["model_kwargs"] = model_kwargs
+        if cfg.get("max_tokens") is not None:
+            kwargs["max_tokens"] = cfg.get("max_tokens")
+        if cfg.get("timeout") is not None:
+            kwargs["timeout"] = cfg.get("timeout")
+        return ChatOpenAI(**kwargs)
 
     elif provider == "google_pro_stable":
         return ChatGoogleGenerativeAI(
@@ -129,11 +154,18 @@ def build_llm(cfg: dict):
         )
     
     elif provider == "openai":
-        return ChatOpenAI(
+        kwargs = dict(
             model=model,
             api_key=api_key,
             temperature=temperature
         )
+        if model_kwargs:
+            kwargs["model_kwargs"] = model_kwargs
+        if cfg.get("max_tokens") is not None:
+            kwargs["max_tokens"] = cfg.get("max_tokens")
+        if cfg.get("timeout") is not None:
+            kwargs["timeout"] = cfg.get("timeout")
+        return ChatOpenAI(**kwargs)
 
     elif provider == "anthropic":
         return ChatAnthropic(
@@ -164,6 +196,18 @@ def main(config_path: str = "config.json"):
         config_path = Path(__file__).parent / config_path
     
     cfg = load_config(Path(config_path))
+    global_enable_thinking = cfg.get("enable_thinking")
+    if isinstance(global_enable_thinking, bool):
+        for section_name in ("llm", "planner_llm", "memory_llm"):
+            section = cfg.get(section_name)
+            if isinstance(section, dict):
+                ctk = section.get("chat_template_kwargs")
+                if isinstance(ctk, dict):
+                    ctk = dict(ctk)
+                else:
+                    ctk = {}
+                ctk["enable_thinking"] = bool(global_enable_thinking)
+                section["chat_template_kwargs"] = ctk
     
     # Update environment variable if different config was passed
     current_logging_level = cfg.get("logging_level", "INFO").lower()
@@ -173,6 +217,24 @@ def main(config_path: str = "config.json"):
 
     # --- Logging -----------------------------------------------------------
     setup_logging(cfg.get("logging_level", "DEBUG"))
+    log_level_str = cfg.get("logging_level", "DEBUG").upper()
+    logging_level = LOG_LEVEL_MAP.get(log_level_str, logging.DEBUG)
+    logging.basicConfig(
+        level=logging_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            RotatingFileHandler("logging.log", maxBytes=20 * 1024 * 1024, backupCount=3),
+        ],
+        force=True,
+    )
+    turix_logger = logging.getLogger("turix")
+    turix_logger.handlers.clear()
+    turix_logger.propagate = True
+    turix_logger.setLevel(logging_level)
+    logging.getLogger("src").setLevel(logging_level)
+    logging.getLogger("src.agent").setLevel(logging_level)
+    logging.getLogger("src.agent.message_manager").setLevel(logging_level)
 
     # --- Cleanup previous runs ---------------------------------------------
     if cfg.get("cleanup_previous_runs", True):
@@ -186,6 +248,8 @@ def main(config_path: str = "config.json"):
     llm = build_llm(cfg["llm"])
     use_planner = agent_cfg.get("use_planner", True)
     planner_llm = build_llm(cfg["planner_llm"]) if use_planner else None
+    memory_llm_cfg = cfg.get("memory_llm")
+    memory_llm = build_llm(memory_llm_cfg) if memory_llm_cfg else None
     controller = Controller()
     save_llm_conversation_path = agent_cfg.get("save_llm_conversation_path")
     save_llm_conversation_path_encoding = agent_cfg.get(
@@ -208,6 +272,7 @@ def main(config_path: str = "config.json"):
         agent_id=agent_cfg.get("agent_id"),
         save_llm_conversation_path=save_llm_conversation_path,
         save_llm_conversation_path_encoding=save_llm_conversation_path_encoding,
+        memory_llm=memory_llm,
     )
 
     async def runner():
