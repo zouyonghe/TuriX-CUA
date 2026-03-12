@@ -50,6 +50,19 @@ skills/local/turix-mac-fast/scripts/run_turix.sh --enable-planner "Finish a long
 skills/local/turix-mac-fast/scripts/run_turix.sh --dry-run "Open Finder"
 ```
 
+## Realtime Progress Monitoring (OpenClaw)
+
+- While TuriX is running, monitor `logging.log` in the TuriX project root for step-level progress.
+- Use:
+```bash
+tail -n 120 -F your_dir/TuriX-CUA/logging.log
+```
+- If you need raw per-step LLM interaction content, read the latest generated step file:
+```bash
+latest_file="$(ls -1t your_dir/TuriX-CUA/llm_interactions_step_*.txt 2>/dev/null | head -n 1)"; [ -n "$latest_file" ] && tail -n 80 "$latest_file"
+```
+- Note: when `agent.save_llm_conversation_path` is set to `llm_interactions.txt`, TuriX writes files as `llm_interactions_step_0001.txt`, `llm_interactions_step_0002.txt`, ... (not a single continuously appended `llm_interactions.txt`).
+
 ## Force Stop Hotkey
 
 - Press `Cmd+Shift+2` to force-stop the running agent.

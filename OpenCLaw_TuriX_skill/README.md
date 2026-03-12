@@ -62,6 +62,25 @@ Dry run:
 scripts/run_turix.sh --dry-run "Open Finder"
 ```
 
+## Realtime progress tracking
+
+Primary monitor (recommended):
+
+```bash
+tail -n 120 -F your_dir/TuriX-CUA/logging.log
+```
+
+Optional detailed monitor (latest LLM interaction step file):
+
+```bash
+latest_file="$(ls -1t your_dir/TuriX-CUA/llm_interactions_step_*.txt 2>/dev/null | head -n 1)"; [ -n "$latest_file" ] && tail -n 80 "$latest_file"
+```
+
+Note:
+
+- If `agent.save_llm_conversation_path` is `llm_interactions.txt`, files are saved as `llm_interactions_step_0001.txt`, `llm_interactions_step_0002.txt`, etc.
+- The realtime stream should rely on `logging.log`; read latest `llm_interactions_step_*.txt` on demand.
+
 Force stop hotkey:
 
 - Press `Cmd+Shift+2` to immediately terminate the running TuriX agent.
