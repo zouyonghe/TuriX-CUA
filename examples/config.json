@@ -36,8 +36,6 @@
     "resume": false,
     "agent_id": null,
     "save_llm_conversation_path": "llm_interactions.txt",
-    "save_llm_conversation_path_encoding": "utf-8",
-    "use_plan": false,
-    "use_skills": false
+    "save_llm_conversation_path_encoding": "utf-8"
   }
 }
