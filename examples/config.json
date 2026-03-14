@@ -9,7 +9,7 @@
     "provider": "turix",
     "api_key": "your_api_key_here",
     "base_url": "https://turixapi.io/v1",
-    "model_name": "gemini-3-flash-preview"
+    "model_name": "turix-brain"
   },
 
   "actor_llm": {
@@ -23,14 +23,14 @@
     "provider": "turix",
     "api_key": "your_api_key_here",
     "base_url": "https://turixapi.io/v1",
-    "model_name": "gemini-3-flash-preview"
+    "model_name": "turix-brain"
   },
 
   "planner_llm": {
     "provider": "turix",
     "api_key": "your_api_key_here",
     "base_url": "https://turixapi.io/v1",
-    "model_name": "gemini-3-flash-preview"
+    "model_name": "turix-brain"
   },
 
   "agent": {
