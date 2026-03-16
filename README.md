@@ -206,6 +206,7 @@ For bug reports and feature requests, please [open an issue](https://github.com/
 | **2025 Q4** | **✅ Duckduckgo Integration** | Speed up the information gathering process, for smarter planning (multi-agent branch) |
 | **2026 Q1** | **✅ Ollama Support** | Support the Ollama Qwen3vl models |
 | **2026 Q1** | **Recoverable Memory Compression** | Advance memory management mechanism to stabelize performance |
+| **2026 Q1** | **✅ Linux Support** | Linux support is now available on branch `multi-agent-linux` (Ubuntu and other distributions). |
 | **2026 Q1** | **Browser Automation** | Support a Chrome-like browser for scalability |
 | **2026 Q1** | **Persistent Memory** | Learn user preferences and maintain task history across sessions |
 | **2026 Q2** | **Learning by Demonstration** | Train the agent by showing it your preferred methods and workflows |
