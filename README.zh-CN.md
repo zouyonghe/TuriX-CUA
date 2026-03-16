@@ -58,6 +58,12 @@ TuriX 让强大的 AI 模型能在你的桌面上真正动手操作。
 
 ## <a id="latest-news"></a>📰 最新动态
 
+**2026 年 3 月 16 日** - 🐧 **Linux 支持已上线**，位于 `multi-agent-linux` 分支。如果你要在 Linux（如 Ubuntu）上运行 TuriX，请先切换分支：
+```bash
+git checkout multi-agent-linux
+```
+
+
 **2026 年 1 月 27 日** - 🎉🎉 我们在 `multi-agent` 与 `multi-agent-windows` 分支发布了 **可恢复的内存压缩** 和 **Skills**。这两项功能带来更稳定的记忆管理与可复用的 Markdown Skills手册，用于规划与执行任务。
 
 **2025 年 12 月 30 日** - 🎉 Agent 架构迎来重要更新。我们在 multi-agent 分支引入多模型架构，将单一模型的压力分散到多个模型上。
