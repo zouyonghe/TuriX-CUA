@@ -70,6 +70,11 @@ OpenClaw 的 Windows 本地技能包位于 `multi-agent-windows` 分支的 `Open
 
 ## <a id="latest-news"></a>📰 最新动态
 
+**2026 年 3 月 16 日** - 🐧 **Linux 支持已上线**，位于 `multi-agent-linux` 分支。如果你要在 Linux（如 Ubuntu）上运行 TuriX，请先切换分支：
+```bash
+git checkout multi-agent-linux
+```
+
 **2026 年 3 月 9 日** - 我们在 `mac_legacy` 分支新增了 **OpenClaw 的 macOS Flash/Fast 模式技能包**。如果你要使用这个更快、更轻量的模式，请先切换分支：
 ```bash
 git checkout mac_legacy
@@ -158,6 +163,12 @@ git checkout mac_legacy
 > ```
 >
 > 如果你要使用更新后的 OpenClaw Windows 本地技能包，请查看该分支中的 `OpenCLaw_TuriX_skill/README.md`。
+>
+> **0. Linux 用户**：请切换到 `multi-agent-linux` 分支获取 Linux 专属的安装与设置说明。
+>
+> ```bash
+> git checkout multi-agent-linux
+> ```
 >
 > **0. Windows 旧版用户**：如需此前的 Windows 版本，请切换到 `windows_legacy` 分支。
 >
@@ -375,7 +386,7 @@ python examples/main.py
 | **2026 Q1** | **✅ Skills** | 让CUA的执行流程更标准化，稳定 |
 | **2026 Q1** | **✅ OpenClaw 技能** | 已在 ClawHub 发布（https://clawhub.ai/Tongyu-Yan/turix-cua），让 OpenClaw 调用 TuriX 作为眼睛和手执行电脑任务。 |
 | **2026 Q1** | **✅ OpenClaw Windows 技能升级** | 已完成 `multi-agent-windows` 本地技能包更新，支持 `turix`/`turix-win` 直接分发、分支校验与 `--dry-run`。 |
-| **2026 Q1** | **Linux 支持** | 支持 Linux 系统（如 Ubuntu 等发行版）。 |
+| **2026 Q1** | **✅ Linux 支持** | Linux 支持已在 `multi-agent-linux` 分支上线（包含 Ubuntu 等发行版）。 |
 | **2026 Q2** | **浏览器自动化** | 支持类 Chrome 浏览器以提升可扩展性 |
 | **2026 Q2** | **长期记忆** | 学习用户偏好并跨会话保留任务历史 |
 | **2026 Q2** | **示范学习** | 通过展示你偏好的方法与流程来训练Agent模型 |
