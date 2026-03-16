@@ -318,7 +318,7 @@ python examples/main.py
 | **2026 Q1** | **✅ Skills** | 让CUA的执行流程更标准化，稳定 |
 | **2026 Q1** | **✅ OpenClaw 技能** | 已在 ClawHub 发布（https://clawhub.ai/Tongyu-Yan/turix-cua），让 OpenClaw 调用 TuriX 作为眼睛和手执行电脑任务。 |
 | **2026 Q1** | **✅ OpenClaw Windows 技能升级** | 已完成 `multi-agent-windows` 本地技能包更新，支持 `turix`/`turix-win` 直接分发、分支校验与 `--dry-run`。 |
-| **2026 Q1** | **Linux 支持** | 支持 Linux 系统（如 Ubuntu 等发行版）。 |
+| **2026 Q1** | **✅ Linux 支持** | Linux 支持已在 `multi-agent-linux` 分支上线（包含 Ubuntu 等发行版）。 |
 | **2026 Q2** | **浏览器自动化** | 支持类 Chrome 浏览器以提升可扩展性 |
 | **2026 Q2** | **长期记忆** | 学习用户偏好并跨会话保留任务历史 |
 | **2026 Q2** | **示范学习** | 通过展示你偏好的方法与流程来训练Agent模型 |
