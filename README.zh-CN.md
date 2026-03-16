@@ -63,6 +63,12 @@ https://clawhub.ai/Tongyu-Yan/turix-cua
 
 ## <a id="latest-news"></a>📰 最新动态
 
+**2026 年 3 月 16 日** - 🐧 **Linux 支持已上线**，位于 `multi-agent-linux` 分支。如果你要在 Linux（如 Ubuntu）上运行 TuriX，请先切换分支：
+```bash
+git checkout multi-agent-linux
+```
+
+
 **2026 年 3 月 5 日** - 我们更新了 `multi-agent-windows` 分支上的 **OpenClaw Windows 本地技能包**。本次更新加入可直接调用的 `turix` 技能别名、无需 Turix 子会话的直接分发机制、`run_turix.ps1` 的分支安全预检查，以及新的代理接口文件 `OpenCLaw_TuriX_skill/agents/openai.yaml`。
 
 **2026 年 1 月 30 日** - 🧩 我们在 ClawHub 发布了 **TuriX OpenClaw 技能**：https://clawhub.ai/Tongyu-Yan/turix-cua。你现在可以使用 OpenClaw 调用 TuriX 来完成桌面自动化任务。
