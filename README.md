@@ -42,6 +42,12 @@ Prefer your own model? **Change in `config.json` and go.**
 
 ## 📰 Latest News
 
+**March 16, 2026** - 🐧 **Linux support is now available** on branch `multi-agent-linux`. If you want to run TuriX on Linux (for example Ubuntu), switch to that branch first:
+```bash
+git checkout multi-agent-linux
+```
+
+
 **October 16, 2025** - 🚀 Big news for automation enthusiasts! TuriX now fully supports the cutting-edge **Qwen3-VL** vision-language model, empowering seamless PC automation across **Windows**. This integration boosts task success rates by up to 15% on complex UI interactions (based on our internal benchmarks), making your desktop workflows smarter and faster than ever. Whether you're scripting daily routines or tackling intricate projects, Qwen3-VL's advanced multimodal reasoning brings unparalleled precision to the table.
 
 Ready to level up? Update your `config.json` and start automating—happy hacking! 🎉
