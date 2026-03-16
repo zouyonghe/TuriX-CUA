@@ -283,6 +283,7 @@ For bug reports and feature requests, please [open an issue](https://github.com/
 | **2026 Q1** | **✅ Ollama Support** | Support the Ollama Qwen3.5vl models |
 | **2026 Q1** | **Recoverable Memory Compression** | Advance memory management mechanism to stabilize performance (beta in `multi-agent` & `multi-agent-windows` branches) |
 | **2026 Q1** | **Skills** | Stabilize the agent workflow (available in `multi-agent` & `multi-agent-windows` branches). |
+| **2026 Q1** | **✅ Linux Support** | Linux support is now available on branch `multi-agent-linux` (Ubuntu and other distributions). |
 | **2026 Q1** | **Browser Automation** | Support a Chrome-like browser for scalability |
 | **2026 Q1** | **Persistent Memory** | Learn user preferences and maintain task history across sessions |
 | **2026 Q2** | **Learning by Demonstration** | Train the agent by showing it your preferred methods and workflows |

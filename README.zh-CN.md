@@ -283,6 +283,7 @@ python examples/main.py
 | **2026 Q1** | **✅ Ollama 支持** | 支持 Ollama Qwen3vl 模型 |
 | **2026 Q1** | **可恢复的内存压缩** | 推进内存管理机制，稳定性能（`multi-agent` 与 `multi-agent-windows` 分支提供 beta） |
 | **2026 Q1** | **Skills** | 让 CUA 执行流程更标准化、更稳定（仅在 `multi-agent` 与 `multi-agent-windows` 分支提供）。 |
+| **2026 Q1** | **✅ Linux 支持** | Linux 支持已在 `multi-agent-linux` 分支上线（包含 Ubuntu 等发行版）。 |
 | **2026 Q1** | **浏览器自动化** | 支持类 Chrome 浏览器以提升可扩展性 |
 | **2026 Q1** | **长期记忆** | 学习用户偏好并跨会话保留任务历史 |
 | **2026 Q2** | **示范学习** | 通过展示你偏好的方法与流程来训练Agent模型 |
