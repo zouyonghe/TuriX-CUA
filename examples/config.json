@@ -16,12 +16,22 @@
     "model_name": "turix-model"
   },
 
+  "memory_llm": {
+    "provider": "turix",
+    "api_key": "your_api_key_here",
+    "base_url": "https://turixapi.io/v1",
+    "model_name": "turix-brain"
+  },
+
   "agent": {
     "task": "open Chrome, go to github, and search for turix-cua in the github webpage. Enter the TuriX-CUA repository, and star it.",
     "use_ui": false,
     "use_planner": false,
     "max_actions_per_step": 5,
     "max_steps": 100,
+    "force_stop_hotkey": "command+shift+2",
+    "memory_budget": 500,
+    "summary_memory_budget": 2000,
     "use_turix": true,
     "resume": false,
     "agent_id": null,
