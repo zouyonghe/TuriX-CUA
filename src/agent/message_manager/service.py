@@ -121,7 +121,12 @@ class MessageManager:
 		while len(self.history.messages) > 2 and isinstance(self.history.messages[-1].message, HumanMessage):
 			self.history.remove_message()
 	def _remove_last_AIntool_message(self) -> None:
-		while len(self.history.messages) > 2 and (isinstance(self.history.messages[-1].message, AIMessage) or isinstance(self.history.messages[-1].message, ToolMessage)):
+		# Keep at least the system message; remove any trailing AI/Tool messages
+		# as a block so we never leave an assistant tool_call without its tool reply.
+		while len(self.history.messages) > 1 and (
+			isinstance(self.history.messages[-1].message, AIMessage)
+			or isinstance(self.history.messages[-1].message, ToolMessage)
+		):
 			self.history.remove_message()
 		
 
