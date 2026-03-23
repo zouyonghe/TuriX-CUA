@@ -140,51 +140,41 @@ class OutputSchemas:
         },
     }
 
+    # Moonshot/Kimi does not support oneOf in response_format.json_schema.
+    # Keep a single-object schema and enforce the mutual-exclusion rule in BrainOutput validator.
     BRAIN_SCHEMA = {
-        "oneOf": [
-            {
+        "type": "object",
+        "properties": {
+            "analysis": {
                 "type": "object",
                 "properties": {
-                    "analysis": {
-                        "type": "object",
-                        "properties": {
-                            "analysis": {"type": "string"},
-                            "sop_check": {"type": "string"}
-                        },
-                        "required": ["analysis", "sop_check"]
-                    },
-                    "current_state": {
-                        "type": "object",
-                        "properties": {
-                            "step_evaluate": {"type": "string"},
-                            "ask_human": {"type": "string"},
-                            "next_goal": {"type": "string"},
-                        },
-                        "required": ["step_evaluate", "ask_human", "next_goal"],
-                    },
+                    "analysis": {"type": "string"},
+                    "sop_check": {"type": "string"},
                 },
-                "required": ["analysis", "current_state"],
-                "additionalProperties": False,
+                "required": ["analysis", "sop_check"],
             },
-            {
+            "current_state": {
                 "type": "object",
                 "properties": {
-                    "read_files": {
-                        "type": "object",
-                        "properties": {
-                            "files": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "minItems": 1,
-                            }
-                        },
-                        "required": ["files"],
+                    "step_evaluate": {"type": "string"},
+                    "ask_human": {"type": "string"},
+                    "next_goal": {"type": "string"},
+                },
+                "required": ["step_evaluate", "ask_human", "next_goal"],
+            },
+            "read_files": {
+                "type": "object",
+                "properties": {
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 1,
                     }
                 },
-                "required": ["read_files"],
-                "additionalProperties": False,
+                "required": ["files"],
             },
-        ]
+        },
+        "additionalProperties": False,
     }
 
     BRAIN_RESPONSE_FORMAT = {
