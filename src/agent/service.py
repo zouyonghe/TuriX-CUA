@@ -258,11 +258,6 @@ class Agent:
         self.skill_context = ""
         self.next_goal = ""
         self.brain_thought = ""
-        self.current_state: dict[str, str] = {
-            "step_evaluate": "unknown",
-            "ask_human": "No",
-            "next_goal": "",
-        }
 
         self.controller = controller
         self.max_actions_per_step = max_actions_per_step
