@@ -23,7 +23,7 @@ Join our Discord community for support, discussions, and updates:
 Or contact us with email: contact@turix.ai
 
 TuriX lets your powerful AI models take real, hands‑on actions directly on your desktop. 
-It ships with a **state‑of‑the‑art computer‑use agent** (passes > 68 % of our internal OSWorld‑style test set) yet stays 100 % open‑source and cost‑free for personal & research use.  
+It ships with a **state‑of‑the‑art computer‑use agent** (achieves 80% success rate on our OSWorld‑style Mac benchmark and 60% success rate on OSWorld) yet stays 100 % open‑source and cost‑free for personal & research use.  
 
 Prefer your own model? **Change in `config.json` and go.**
 
