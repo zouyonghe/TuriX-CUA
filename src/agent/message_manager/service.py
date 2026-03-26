@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import List, Optional, Type
+from typing import Any, List, Optional, Type
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
@@ -104,22 +104,78 @@ class MessageManager:
 		self.min_history_messages = len(self.history.messages)
 
 	def _supports_tool_messages(self, llm: BaseChatModel) -> bool:
+		model_candidate = self._unwrap_bound_llm(llm)
 		explicit = getattr(llm, "_turix_supports_tool_calling", None)
+		if explicit is None and model_candidate is not llm:
+			explicit = getattr(model_candidate, "_turix_supports_tool_calling", None)
 		if explicit is not None:
 			return bool(explicit)
+
+		tool_choice = self._extract_tool_choice(llm)
+		if isinstance(tool_choice, str) and tool_choice.lower() == "none":
+			return False
+		if isinstance(tool_choice, dict) and str(tool_choice.get("type", "")).lower() == "none":
+			return False
+
+		identity_parts = []
+		for candidate in [llm, model_candidate]:
+			if candidate is None:
+				continue
+			identity_parts.extend(
+				[
+					candidate.__class__.__name__,
+					getattr(candidate, "model_name", ""),
+					getattr(candidate, "model", ""),
+					getattr(candidate, "openai_api_base", ""),
+					getattr(candidate, "base_url", ""),
+					str(getattr(candidate, "kwargs", "")),
+					str(getattr(candidate, "model_kwargs", "")),
+				]
+			)
 		identity = " ".join(
 			str(part).lower()
-			for part in [
-				llm.__class__.__name__,
-				getattr(llm, "model_name", ""),
-				getattr(llm, "model", ""),
-				getattr(llm, "openai_api_base", ""),
-				getattr(llm, "base_url", ""),
-			]
+			for part in identity_parts
 			if part
 		)
-		unsupported_tokens = ("deepseek", "minimax", "m2.5")
+		unsupported_tokens = (
+			"deepseek",
+			"minimax",
+			"m2.5",
+			"moonshot",
+			"kimi",
+			"dashscope",
+			"tongyi",
+			"qwen-plus",
+			"qwen3.5-plus",
+		)
 		return not any(token in identity for token in unsupported_tokens)
+
+	def _unwrap_bound_llm(self, llm: Any) -> Any:
+		"""Unwrap LangChain RunnableBinding-like wrappers to access the base model."""
+		current = llm
+		seen: set[int] = set()
+		while current is not None and id(current) not in seen:
+			seen.add(id(current))
+			next_bound = getattr(current, "bound", None)
+			if next_bound is None:
+				break
+			current = next_bound
+		return current
+
+	def _extract_tool_choice(self, llm: Any) -> Any:
+		"""Read tool_choice from wrapper kwargs or base model kwargs when available."""
+		current = llm
+		seen: set[int] = set()
+		while current is not None and id(current) not in seen:
+			seen.add(id(current))
+			kwargs = getattr(current, "kwargs", None)
+			if isinstance(kwargs, dict) and "tool_choice" in kwargs:
+				return kwargs.get("tool_choice")
+			model_kwargs = getattr(current, "model_kwargs", None)
+			if isinstance(model_kwargs, dict) and "tool_choice" in model_kwargs:
+				return model_kwargs.get("tool_choice")
+			current = getattr(current, "bound", None)
+		return None
 
 
 	def add_state_message(
