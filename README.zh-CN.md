@@ -23,6 +23,8 @@
 如果对我们的项目感兴趣，也欢迎加入我们的微信群：
 ![QRcode](https://raw.githubusercontent.com/Dennisyk348/QRcode/main/QRcode_0309.jpg)
 
+你也可以在这里找到我们的项目：[网页链接]https://atomgit.com/TuriXAI/TuriX-CUA
+
 或通过邮件联系我们：contact@turix.ai
 
 TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
