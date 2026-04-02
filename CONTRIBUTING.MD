@@ -54,6 +54,11 @@ Thank you for your interest in contributing to TuriX! This project is a computer
 ## Project Structure
 
 ```
+config.example              # Sample configuration template
+main.py                     # Main TuriX entrypoint
+mcp_bridge.py               # MCP launch/status bridge helpers
+mcp_job_runner.py           # Background MCP job runner
+mcp_server.py               # Local stdio MCP server
 src/
 ├── agent/                  # Core AI agent functionality
 │   ├── service.py         # Main agent orchestration
@@ -70,7 +75,7 @@ src/
 │   ├── actions.py         # Low-level macOS actions (click, type, scroll)
 │   ├── element.py         # UI element representation
 │   └── tree.py            # UI tree building and screenshot annotation
-└── utils.py               # Utility functions
+└── utils/                 # Shared utility modules
 ```
 
 ## Contributing Workflow

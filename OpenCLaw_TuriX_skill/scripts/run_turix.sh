@@ -6,7 +6,7 @@ set -e
 
 # ---------- Configuration ----------
 PROJECT_DIR="your_dir/TuriX-CUA"
-CONFIG_FILE="$PROJECT_DIR/examples/config.json"
+CONFIG_FILE="$PROJECT_DIR/config"
 CONDA_PATH="/opt/anaconda3/bin/conda"
 ENV_NAME="turix_env"
 
@@ -168,6 +168,7 @@ preflight_checks() {
     # Config check
     if [[ ! -f "$CONFIG_FILE" ]]; then
         log_error "Config not found: $CONFIG_FILE"
+        log_error "Copy $PROJECT_DIR/config.example to $PROJECT_DIR/config first"
         exit 1
     fi
 
@@ -187,7 +188,7 @@ exit(0 if CoreGraphics.CGPreflightScreenCaptureAccess() else 1)
 # ---------- Main ----------
 main() {
     cd "$PROJECT_DIR"
-    log_info "TuriX CUA"
+    log_info "TuriX-CUA"
     log_info "Project: $PROJECT_DIR"
 
     if [[ "$DRY_RUN" == true ]]; then
@@ -195,17 +196,17 @@ main() {
         echo "  Task: ${*:-(resume) ${RESUME_ID}}"
         echo "  Plan: $USE_PLAN"
         echo "  Skills: $USE_SKILLS"
-        echo "  Command: $CONDA_PATH run -n $ENV_NAME python examples/main.py"
+        echo "  Command: $CONDA_PATH run -n $ENV_NAME python main.py"
         exit 0
     fi
 
-    update_config "$@"
     preflight_checks
+    update_config "$@"
 
     log_info "Starting TuriX..."
     log_info "Press Cmd+Shift+2 to force stop"
 
-    "$CONDA_PATH" run -n "$ENV_NAME" python examples/main.py
+    "$CONDA_PATH" run -n "$ENV_NAME" python main.py
 }
 
 main

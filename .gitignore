@@ -1,3 +1,5 @@
 .turix_tmp/
 docs/plans/
 __pycache__/
+config
+config.json

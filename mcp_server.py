@@ -36,7 +36,7 @@ def run_task(
     dry_run: bool = False,
     timeout_sec: int | None = None,
 ) -> dict[str, Any]:
-    """Run a new TuriX task through the existing examples/main.py entrypoint."""
+    """Run a new TuriX task through the main.py entrypoint."""
     try:
         return run_task_bridge(
             task=task,

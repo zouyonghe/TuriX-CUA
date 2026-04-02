@@ -44,7 +44,7 @@ skills/local/turix-mac/scripts/run_turix.sh "Open Chrome and go to github.com"
 skills/local/turix-mac/scripts/run_turix.sh --resume my-task-001
 ```
 
-> ✅ **Note**: `run_turix.sh` updates `examples/config.json` for you (task, resume, `use_plan`, `use_skills`). If you want to keep a hand-edited config, skip passing a task and edit `examples/config.json` directly.
+> ✅ **Note**: `run_turix.sh` updates `config` for you (task, resume, `use_plan`, `use_skills`). If you want to keep a hand-edited config, copy `config.example` to `config` first, then skip passing a task and edit `config` directly.
 
 
 ### Tips for Effective Tasks
@@ -86,7 +86,7 @@ Logs are saved to `.turix_tmp/logging.log` in the project directory. Check this 
 ```bash
 export PATH="/usr/sbin:$PATH"
 cd your_dir/TuriX-CUA
-/opt/anaconda3/envs/turix_env/bin/python examples/main.py
+/opt/anaconda3/envs/turix_env/bin/python main.py
 ```
 
 **Why?** The `screencapture` tool is located at `/usr/sbin/screencapture`, which is not in the default PATH.
@@ -97,7 +97,7 @@ cd your_dir/TuriX-CUA
 ps aux | grep "python.*main" | grep -v grep
 
 # Should show something like:
-# user  57425  0.0  2.4 412396704 600496 s143  Ss+  5:56PM   0:04.76 /opt/anaconda3/envs/turix_env/bin/python examples/main.py
+# user  57425  0.0  2.4 412396704 600496 s143  Ss+  5:56PM   0:04.76 /opt/anaconda3/envs/turix_env/bin/python main.py
 ```
 
 **Note:** The `.turix_tmp` directory may not be created until TuriX starts executing steps.
@@ -197,7 +197,7 @@ description: When performing X specific task
 
 ### 3. Enable Skills
 
-In `examples/config.json`:
+In `config`:
 
 ```json
 {
@@ -334,7 +334,7 @@ clawdbot sessions_history <session_key>
 tail -f your_dir/TuriX-CUA/.turix_tmp/logging.log
 
 # Or inspect completed step files
-ls -lt your_dir/TuriX-CUA/examples/.turix_tmp/brain_llm_interactions.log_brain_*.txt
+ls -lt your_dir/TuriX-CUA/.turix_tmp/brain_llm_interactions.log_brain_*.txt
 ```
 
 **Method 3: Check processes**
@@ -345,7 +345,7 @@ ps aux | grep "python.*main.py" | grep -v grep
 **Method 4: Check generated files**
 ```bash
 # List files created by the agent
-ls -la your_dir/TuriX-CUA/examples/.turix_tmp/*.txt
+ls -la your_dir/TuriX-CUA/.turix_tmp/*.txt
 ```
 
 ### 3. Log File Reference
@@ -370,7 +370,7 @@ ls -la your_dir/TuriX-CUA/examples/.turix_tmp/*.txt
 | Process unresponsive | `ps aux | grep main.py` |
 | Stuck on step 1 | Check whether `.turix_tmp/` was created |
 | Model loading is slow | First run can take 1-2 minutes to load models |
-| No log output | Check `config.json` `logging_level` |
+| No log output | Check `config` `logging_level` |
 
 ### 5. Force Stop
 
@@ -378,7 +378,7 @@ ls -la your_dir/TuriX-CUA/examples/.turix_tmp/*.txt
 
 **Command**:
 ```bash
-pkill -f "python examples/main.py"
+pkill -f "python main.py"
 ```
 
 ### 6. View Results
@@ -390,7 +390,7 @@ After completion, the agent will:
 
 **Example: view a summary file**
 ```bash
-cat your_dir/TuriX-CUA/examples/.turix_tmp/latest_ai_news_summary_jan2026.txt
+cat your_dir/TuriX-CUA/.turix_tmp/latest_ai_news_summary_jan2026.txt
 ```
 
 ### 7. Debugging Tips
@@ -410,11 +410,11 @@ cat your_dir/TuriX-CUA/examples/.turix_tmp/latest_ai_news_summary_jan2026.txt
 sleep 10 && ps aux | grep main.py
 
 # 3. Check if logs are being created
-ls -la your_dir/TuriX-CUA/examples/.turix_tmp/
+ls -la your_dir/TuriX-CUA/.turix_tmp/
 
 # 4. Tail progress in real time
 tail -f your_dir/TuriX-CUA/.turix_tmp/logging.log
 
 # 5. Check current step count
-ls your_dir/TuriX-CUA/examples/.turix_tmp/brain_llm_interactions.log_brain_*.txt | wc -l
+ls your_dir/TuriX-CUA/.turix_tmp/brain_llm_interactions.log_brain_*.txt | wc -l
 ```

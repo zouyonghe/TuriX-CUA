@@ -17,7 +17,10 @@ from job_status import read_status, update_status, write_status
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "examples" / "config.json"
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config"
+DEFAULT_CONFIG_CANDIDATES = ("config", "config.json", "config.example")
+EXAMPLE_CONFIG_PATH = PROJECT_ROOT / "config.example"
+EXAMPLE_CONFIG_CANDIDATES = ("config.example", "config.example.json")
 DEFAULT_TEMP_DIR = PROJECT_ROOT / ".turix_tmp" / "mcp"
 DEFAULT_OUTPUT_LIMIT = 4000
 
@@ -27,7 +30,7 @@ class BridgeInputError(ValueError):
 
 
 def get_example_config(config_path: str | Path | None = None) -> dict[str, Any]:
-    path = _resolve_config_path(config_path)
+    path = _resolve_example_config_path(config_path)
     return _load_config(path, resolve_env=True)
 
 
@@ -358,14 +361,40 @@ def cancel_task_bridge(*, job_id: str) -> dict[str, Any]:
 
 
 def _resolve_config_path(config_path: str | Path | None) -> Path:
-    path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
+    if config_path is None:
+        return _resolve_existing_project_path(
+            DEFAULT_CONFIG_CANDIDATES,
+            fallback=DEFAULT_CONFIG_PATH,
+        )
+
+    path = Path(config_path).expanduser()
     if not path.is_absolute():
         path = (PROJECT_ROOT / path).resolve()
     return path
 
 
+def _resolve_example_config_path(config_path: str | Path | None) -> Path:
+    if config_path is not None:
+        return _resolve_config_path(config_path)
+
+    return _resolve_existing_project_path(
+        EXAMPLE_CONFIG_CANDIDATES,
+        fallback=EXAMPLE_CONFIG_PATH,
+    )
+
+
+def _resolve_existing_project_path(
+    candidates: tuple[str, ...], *, fallback: Path
+) -> Path:
+    for name in candidates:
+        candidate = (PROJECT_ROOT / name).resolve()
+        if candidate.exists():
+            return candidate
+    return fallback
+
+
 def _main_entrypoint_path() -> Path:
-    return PROJECT_ROOT / "examples" / "main.py"
+    return PROJECT_ROOT / "main.py"
 
 
 def _runner_entrypoint_path() -> Path:

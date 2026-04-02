@@ -5,29 +5,29 @@
   "brain_llm": {
     "provider": "gpt",
     "model_name": "gpt-5.4",
-    "api_key": "sk-5ghtQdw0kc9lbaE1LkjTNpsmi1uTVADhB4uPukTfL1fanVih",
-    "base_url": "https://proxy.pieixan.icu/v1"
+    "api_key": "$OPENAI_API_KEY",
+    "base_url": "https://api.openai.com/v1"
   },
   "actor_llm": {
     "provider": "gpt",
     "model_name": "gpt-5.4",
-    "api_key": "sk-5ghtQdw0kc9lbaE1LkjTNpsmi1uTVADhB4uPukTfL1fanVih",
-    "base_url": "https://proxy.pieixan.icu/v1"
+    "api_key": "$OPENAI_API_KEY",
+    "base_url": "https://api.openai.com/v1"
   },
   "planner_llm": {
     "provider": "gpt",
     "model_name": "gpt-5.4",
-    "api_key": "sk-5ghtQdw0kc9lbaE1LkjTNpsmi1uTVADhB4uPukTfL1fanVih",
-    "base_url": "https://proxy.pieixan.icu/v1"
+    "api_key": "$OPENAI_API_KEY",
+    "base_url": "https://api.openai.com/v1"
   },
   "memory_llm": {
     "provider": "gpt",
     "model_name": "gpt-5.4",
-    "api_key": "sk-5ghtQdw0kc9lbaE1LkjTNpsmi1uTVADhB4uPukTfL1fanVih",
-    "base_url": "https://proxy.pieixan.icu/v1"
+    "api_key": "$OPENAI_API_KEY",
+    "base_url": "https://api.openai.com/v1"
   },
   "agent": {
-    "task": "open Chrome, go to github, and search for turix-cua in the github webpage. Enter the TuriX-CUA repository, and star it.",
+    "task": "Open GitHub in a browser, search for TuriX-CUA, open the repository page, and stop when it is visible.",
     "memory_budget": 2000,
     "summary_memory_budget": 8000,
     "use_ui": false,

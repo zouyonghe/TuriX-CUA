@@ -4,8 +4,11 @@ from pathlib import Path
 from pynput import keyboard
 
 # Add the project root to Python path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
+
+DEFAULT_CONFIG_NAME = "config"
+LEGACY_CONFIG_NAMES = ("config.json", "config.example")
 
 from config_env import resolve_env_placeholders
 from langchain_openai import ChatOpenAI
@@ -138,6 +141,20 @@ def resolve_job_status_path(raw_path: str | None, config_path: Path) -> Path | N
     if not path.is_absolute():
         path = (config_path.parent / path).resolve()
     return path
+
+
+def resolve_config_path(config_path: str | Path) -> Path:
+    path = Path(config_path).expanduser()
+    if path.is_absolute():
+        return path
+
+    if str(path) == DEFAULT_CONFIG_NAME:
+        for candidate_name in (DEFAULT_CONFIG_NAME, *LEGACY_CONFIG_NAMES):
+            candidate = project_root / candidate_name
+            if candidate.exists():
+                return candidate
+
+    return project_root / path
 
 
 def load_config(path: Path) -> dict:
@@ -367,12 +384,8 @@ def build_llm(cfg: dict, *, enable_thinking: bool | None = None):
 
 
 # ---------- Main ------------------------------------------------------------
-def main(config_path: str = "config.json"):
-    # Make config path relative to script location if it's a relative path
-    if not Path(config_path).is_absolute():
-        config_path = Path(__file__).parent / config_path
-
-    config_path = Path(config_path)
+def main(config_path: str = DEFAULT_CONFIG_NAME):
+    config_path = resolve_config_path(config_path)
     cfg = load_config(config_path)
     output_dir = resolve_output_dir(cfg, config_path)
     job_status_path = resolve_job_status_path(cfg.get("job_status_path"), config_path)
@@ -567,7 +580,7 @@ def main(config_path: str = "config.json"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the TuriX agent.")
     parser.add_argument(
-        "-c", "--config", default="config.json", help="Path to configuration JSON file"
+        "-c", "--config", default=DEFAULT_CONFIG_NAME, help="Path to configuration file"
     )
     args = parser.parse_args()
     main(args.config)
