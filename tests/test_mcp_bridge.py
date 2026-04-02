@@ -188,11 +188,56 @@ class ExampleConfigTests(unittest.TestCase):
         self.assertIn("base_url", config["brain_llm"])
 
     @patch.dict(os.environ, {"API_KEY": "sk-test", "BASE_URL": "https://example.test/v1"}, clear=True)
-    def test_get_example_config_expands_env_placeholders(self) -> None:
-        config = get_example_config()
+    def test_get_example_config_expands_env_placeholders_from_custom_config(self) -> None:
+        config = {
+            "brain_llm": {
+                "provider": "gpt",
+                "model_name": "gpt-5.4",
+                "api_key": "$API_KEY",
+                "base_url": "$BASE_URL",
+            },
+            "actor_llm": {
+                "provider": "gpt",
+                "model_name": "gpt-5.4",
+                "api_key": "$API_KEY",
+                "base_url": "$BASE_URL",
+            },
+            "memory_llm": {
+                "provider": "gpt",
+                "model_name": "gpt-5.4",
+                "api_key": "$API_KEY",
+                "base_url": "$BASE_URL",
+            },
+            "planner_llm": {
+                "provider": "gpt",
+                "model_name": "gpt-5.4",
+                "api_key": "$API_KEY",
+                "base_url": "$BASE_URL",
+            },
+            "agent": {"task": "demo"},
+        }
 
-        self.assertEqual(config["brain_llm"]["api_key"], "sk-test")
-        self.assertEqual(config["brain_llm"]["base_url"], "https://example.test/v1")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            resolved = get_example_config(config_path)
+
+        self.assertEqual(resolved["brain_llm"]["api_key"], "sk-test")
+        self.assertEqual(resolved["brain_llm"]["base_url"], "https://example.test/v1")
+
+
+class ExampleTemplateTests(unittest.TestCase):
+    def test_examples_config_keeps_turix_template_defaults(self) -> None:
+        config_path = Path(__file__).resolve().parent.parent / "examples" / "config.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(config["brain_llm"]["provider"], "turix")
+        self.assertEqual(config["brain_llm"]["model_name"], "turix-brain")
+        self.assertEqual(config["brain_llm"]["api_key"], "your_api_key_here")
+        self.assertEqual(config["brain_llm"]["base_url"], "https://turixapi.io/v1")
+
+        self.assertEqual(config["actor_llm"]["provider"], "turix")
+        self.assertEqual(config["actor_llm"]["model_name"], "turix-actor")
 
 
 class MCPServerModuleTests(unittest.TestCase):

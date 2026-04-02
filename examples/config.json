@@ -3,31 +3,31 @@
   "output_dir": ".turix_tmp",
   "brain_enable_thinking": false,
   "brain_llm": {
-    "provider": "gpt",
-    "model_name": "gpt-5.4",
-    "api_key": "$API_KEY",
-    "base_url": "$BASE_URL"
+    "provider": "turix",
+    "model_name": "turix-brain",
+    "api_key": "your_api_key_here",
+    "base_url": "https://turixapi.io/v1" 
   },
 
   "actor_llm": {
-    "provider": "gpt",
-    "model_name": "gpt-5.4",
-    "api_key": "$API_KEY",
-    "base_url": "$BASE_URL"
+    "provider": "turix",
+    "model_name": "turix-actor",
+    "api_key": "your_api_key_here",
+    "base_url": "https://turixapi.io/v1" 
   },
 
   "planner_llm": {
-    "provider": "gpt",
-    "model_name": "gpt-5.4",
-    "api_key": "$API_KEY",
-    "base_url": "$BASE_URL"
+    "provider": "turix",
+    "model_name": "turix-brain",
+    "api_key": "your_api_key_here",
+    "base_url": "https://turixapi.io/v1" 
   },
 
   "memory_llm": {
-    "provider": "gpt",
-    "model_name": "gpt-5.4",
-    "api_key": "$API_KEY",
-    "base_url": "$BASE_URL"
+    "provider": "turix",
+    "model_name": "turix-brain",
+    "api_key": "your_api_key_here",
+    "base_url": "https://turixapi.io/v1" 
   },
 
   "agent": {
