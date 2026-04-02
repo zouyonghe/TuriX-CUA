@@ -17,10 +17,15 @@ from job_status import read_status, update_status, write_status
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config"
-DEFAULT_CONFIG_CANDIDATES = ("config", "config.json", "config.example")
-EXAMPLE_CONFIG_PATH = PROJECT_ROOT / "config.example"
-EXAMPLE_CONFIG_CANDIDATES = ("config.example", "config.example.json")
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.json"
+DEFAULT_CONFIG_CANDIDATES = (
+    "config.json",
+    "config",
+    "config.example.json",
+    "config.example",
+)
+EXAMPLE_CONFIG_PATH = PROJECT_ROOT / "config.example.json"
+EXAMPLE_CONFIG_CANDIDATES = ("config.example.json", "config.example")
 DEFAULT_TEMP_DIR = PROJECT_ROOT / ".turix_tmp" / "mcp"
 DEFAULT_OUTPUT_LIMIT = 4000
 

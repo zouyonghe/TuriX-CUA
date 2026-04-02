@@ -25,7 +25,7 @@ from config_env import resolve_env_placeholders
 def _create_launchable_project_root(base_dir: Path) -> Path:
     (base_dir / "main.py").write_text("print('ok')\n", encoding="utf-8")
     (base_dir / "mcp_job_runner.py").write_text("print('runner')\n", encoding="utf-8")
-    config_path = base_dir / "config"
+    config_path = base_dir / "config.json"
     config_path.write_text(
         json.dumps({"agent": {"task": "original task"}}), encoding="utf-8"
     )
@@ -216,7 +216,7 @@ class RunTaskBridgeTests(unittest.TestCase):
         }
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
+            config_path = Path(tmpdir) / "config.json"
             config_path.write_text(json.dumps(config), encoding="utf-8")
 
             with patch("mcp_bridge.DEFAULT_TEMP_DIR", Path(tmpdir)):
@@ -423,7 +423,7 @@ class RunTaskBridgeTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
-            config_path = project_root / "config"
+            config_path = project_root / "config.json"
             config_path.write_text(json.dumps(config), encoding="utf-8")
             (project_root / "main.py").write_text("print('ok')\n", encoding="utf-8")
 
@@ -938,7 +938,7 @@ class HealthCheckTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
             (project_root / "main.py").write_text("print('ok')\n", encoding="utf-8")
-            config_path = project_root / "config"
+            config_path = project_root / "config.json"
             config_path.write_text(
                 json.dumps({"agent": {"task": "demo"}}), encoding="utf-8"
             )
@@ -1033,7 +1033,7 @@ class ExampleConfigTests(unittest.TestCase):
         }
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "config"
+            config_path = Path(tmpdir) / "config.json"
             config_path.write_text(json.dumps(config), encoding="utf-8")
             resolved = get_example_config(config_path)
 
@@ -1043,16 +1043,16 @@ class ExampleConfigTests(unittest.TestCase):
 
 class ExampleTemplateTests(unittest.TestCase):
     def test_config_example_keeps_safe_template_defaults(self) -> None:
-        config_path = Path(__file__).resolve().parent.parent / "config.example"
+        config_path = Path(__file__).resolve().parent.parent / "config.example.json"
         config = json.loads(config_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(config["brain_llm"]["provider"], "gpt")
-        self.assertEqual(config["brain_llm"]["model_name"], "gpt-5.4")
-        self.assertEqual(config["brain_llm"]["api_key"], "$OPENAI_API_KEY")
-        self.assertEqual(config["brain_llm"]["base_url"], "https://api.openai.com/v1")
+        self.assertEqual(config["brain_llm"]["provider"], "turix")
+        self.assertEqual(config["brain_llm"]["model_name"], "turix-brain")
+        self.assertEqual(config["brain_llm"]["api_key"], "your_api_key_here")
+        self.assertEqual(config["brain_llm"]["base_url"], "https://turixapi.io/v1")
 
-        self.assertEqual(config["actor_llm"]["provider"], "gpt")
-        self.assertEqual(config["actor_llm"]["model_name"], "gpt-5.4")
+        self.assertEqual(config["actor_llm"]["provider"], "turix")
+        self.assertEqual(config["actor_llm"]["model_name"], "turix-actor")
 
 
 class MCPServerModuleTests(unittest.TestCase):

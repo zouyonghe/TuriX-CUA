@@ -7,8 +7,8 @@ from pynput import keyboard
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-DEFAULT_CONFIG_NAME = "config"
-LEGACY_CONFIG_NAMES = ("config.json", "config.example")
+DEFAULT_CONFIG_NAME = "config.json"
+LEGACY_CONFIG_NAMES = ("config", "config.example.json", "config.example")
 
 from config_env import resolve_env_placeholders
 from langchain_openai import ChatOpenAI

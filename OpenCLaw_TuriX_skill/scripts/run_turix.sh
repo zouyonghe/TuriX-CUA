@@ -6,7 +6,7 @@ set -e
 
 # ---------- Configuration ----------
 PROJECT_DIR="your_dir/TuriX-CUA"
-CONFIG_FILE="$PROJECT_DIR/config"
+CONFIG_FILE="$PROJECT_DIR/config.json"
 CONDA_PATH="/opt/anaconda3/bin/conda"
 ENV_NAME="turix_env"
 
@@ -168,7 +168,7 @@ preflight_checks() {
     # Config check
     if [[ ! -f "$CONFIG_FILE" ]]; then
         log_error "Config not found: $CONFIG_FILE"
-        log_error "Copy $PROJECT_DIR/config.example to $PROJECT_DIR/config first"
+        log_error "Copy $PROJECT_DIR/config.example.json to $PROJECT_DIR/config.json first"
         exit 1
     fi
 

@@ -44,7 +44,7 @@ skills/local/turix-mac/scripts/run_turix.sh "Open Chrome and go to github.com"
 skills/local/turix-mac/scripts/run_turix.sh --resume my-task-001
 ```
 
-> ✅ **Note**: `run_turix.sh` updates `config` for you (task, resume, `use_plan`, `use_skills`). If you want to keep a hand-edited config, copy `config.example` to `config` first, then skip passing a task and edit `config` directly.
+> ✅ **Note**: `run_turix.sh` updates `config.json` for you (task, resume, `use_plan`, `use_skills`). If you want to keep a hand-edited config, copy `config.example.json` to `config.json` first, then skip passing a task and edit `config.json` directly.
 
 
 ### Tips for Effective Tasks
@@ -197,7 +197,7 @@ description: When performing X specific task
 
 ### 3. Enable Skills
 
-In `config`:
+In `config.json`:
 
 ```json
 {
@@ -370,7 +370,7 @@ ls -la your_dir/TuriX-CUA/.turix_tmp/*.txt
 | Process unresponsive | `ps aux | grep main.py` |
 | Stuck on step 1 | Check whether `.turix_tmp/` was created |
 | Model loading is slow | First run can take 1-2 minutes to load models |
-| No log output | Check `config` `logging_level` |
+| No log output | Check `config.json` `logging_level` |
 
 ### 5. Force Stop
 
