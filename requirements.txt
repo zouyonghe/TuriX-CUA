@@ -2,6 +2,7 @@
 pyautogui
 pynput
 pypinyin
+mcp[cli]
 numpy>=1.24.0
 Pillow>=10.0.0
 rapidfuzz>=3.0.0

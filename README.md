@@ -30,6 +30,7 @@ Prefer your own model? **Change in `config.json` and go.**
 ## Table of Contents
 - [📞 Contact & Community](#-contact--community)
 - [🤖 OpenClaw Skill](#-openclaw-skill)
+- [🧰 Codex MCP Server](#-codex-mcp-server)
 - [📰 Latest News](#-latest-news)
 - [🖼️ Demos](#️-demos)
 - [✨ Key Features](#-key-features)
@@ -59,6 +60,32 @@ Copy it into your OpenClaw local skills folder (for example: `clawd/skills/local
 Local OpenClaw skill (Windows): on branch `multi-agent-windows`, `OpenCLaw_TuriX_skill/` is updated for Windows with `SKILL.md`, `scripts/run_turix.ps1`, and `agents/openai.yaml`.  
 This update adds direct dispatch via `turix` (alias `turix-win`) in the current OpenClaw session, plus pre-flight checks in `run_turix.ps1` (required branch `multi-agent-windows`, conda/config validation, and `--dry-run` support).
 You can also instruct OpenClaw directly: read `OpenCLaw_TuriX_skill/README.md` first, then install and configure TuriX.
+
+---
+
+## 🧰 Codex MCP Server
+
+This repository now includes a local stdio MCP server entrypoint at `mcp_server.py` so Codex can call TuriX directly as a tool.
+
+Typical setup:
+
+```bash
+pip install -r requirements.txt
+codex mcp add turix -- python /path/to/TuriX-CUA/mcp_server.py
+```
+
+If you use conda, point Codex at the Python inside the same environment where TuriX is installed.
+
+Recommended first call from Codex:
+- `health_check`
+
+Primary tools exposed by this server:
+- `run_task`
+- `resume_task`
+- `get_example_config`
+- `health_check`
+
+The MCP server is intentionally thin: it prepares a temporary config, then launches the existing `examples/main.py` entrypoint with the same Python interpreter.
 
 ---
 

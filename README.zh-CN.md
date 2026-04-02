@@ -38,6 +38,7 @@ TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
 ## 目录
 - [📞 联系方式与社区](#contact-community)
 - [🤖 OpenClaw 技能](#openclaw-skill)
+- [🧰 Codex MCP Server](#codex-mcp-server)
 - [📰 最新动态](#latest-news)
 - [🖼️ 演示](#demos)
 - [✨ 关键特性](#key-features)
@@ -67,6 +68,32 @@ https://clawhub.ai/Tongyu-Yan/turix-cua
 OpenClaw 的 Windows 本地技能包位于 `multi-agent-windows` 分支的 `OpenCLaw_TuriX_skill/`，包含 `SKILL.md`、`scripts/run_turix.ps1` 与 `agents/openai.yaml`。  
 该更新支持在当前 OpenClaw 会话中通过 `turix`（别名 `turix-win`）直接分发任务，并在 `run_turix.ps1` 中增加了预检查（强制分支 `multi-agent-windows`、conda/config 校验、`--dry-run` 支持）。
 你也可以直接让 OpenClaw 先阅读 `OpenCLaw_TuriX_skill/README.md`，再按文档安装并配置 TuriX。
+
+---
+
+## <a id="codex-mcp-server"></a>🧰 Codex MCP Server
+
+本仓库现在包含一个本地 stdio MCP server 入口 `mcp_server.py`，这样 Codex 就可以把 TuriX 当成工具直接调用。
+
+典型安装方式：
+
+```bash
+pip install -r requirements.txt
+codex mcp add turix -- python /path/to/TuriX-CUA/mcp_server.py
+```
+
+如果你使用 conda，请让 Codex 指向和 TuriX 相同环境里的 Python。
+
+推荐让 Codex 的第一次调用先执行：
+- `health_check`
+
+当前暴露的主要工具：
+- `run_task`
+- `resume_task`
+- `get_example_config`
+- `health_check`
+
+这个 MCP server 刻意保持很薄：它只负责准备临时配置，然后用同一个 Python 解释器启动现有的 `examples/main.py`。
 
 ---
 
