@@ -320,7 +320,7 @@ def to_structured(llm: Optional[BaseChatModel], Schema, Structured_Output) -> Op
 
     • ChatOpenAI / AzureChatOpenAI  → bind(response_format=…)      (OpenAI style)
     • ChatAnthropic / ChatGoogleGenerativeAI → with_structured_output(…) (Claude/Gemini style)
-    • ChatOllama → bind(format=<json schema>) (Ollama json schema)
+    • ChatOllama → bind(format=<json schema>) (Ollama json schema, when enabled)
     • anything else → returned unchanged
     """
     OPENAI_CLASSES: tuple[Type[BaseChatModel], ...] = (ChatOpenAI, AzureChatOpenAI)
@@ -362,6 +362,12 @@ def to_structured(llm: Optional[BaseChatModel], Schema, Structured_Output) -> Op
         return llm.with_structured_output(Structured_Output)
 
     if isinstance(llm, OLLAMA_CLASSES):
+        if not llm_supports_response_format(llm):
+            logger.info(
+                "Structured response_format is disabled for Ollama model '%s'; falling back to prompt-only JSON.",
+                getattr(llm, "model_name", getattr(llm, "model", "unknown")),
+            )
+            return llm
         # Ollama expects a raw JSON schema in the "format" param.
         schema = None
         if isinstance(Schema, dict):
