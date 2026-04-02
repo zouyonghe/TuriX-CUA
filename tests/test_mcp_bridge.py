@@ -95,6 +95,61 @@ class RunTaskBridgeTests(unittest.TestCase):
         with self.assertRaises(BridgeInputError):
             run_task_bridge(task="")
 
+    @patch.dict(os.environ, {}, clear=True)
+    def test_run_task_bridge_dry_run_preserves_env_placeholders_in_runtime_config(self) -> None:
+        config = {
+            "brain_llm": {
+                "provider": "gpt",
+                "model_name": "gpt-5.4",
+                "api_key": "$API_KEY",
+                "base_url": "$BASE_URL",
+            },
+            "actor_llm": {
+                "provider": "gpt",
+                "model_name": "gpt-5.4",
+                "api_key": "$API_KEY",
+                "base_url": "$BASE_URL",
+            },
+            "memory_llm": {
+                "provider": "gpt",
+                "model_name": "gpt-5.4",
+                "api_key": "$API_KEY",
+                "base_url": "$BASE_URL",
+            },
+            "planner_llm": {
+                "provider": "gpt",
+                "model_name": "gpt-5.4",
+                "api_key": "$API_KEY",
+                "base_url": "$BASE_URL",
+            },
+            "agent": {
+                "task": "original task",
+                "use_plan": True,
+                "use_skills": True,
+                "resume": False,
+                "agent_id": None,
+                "max_steps": 100,
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+
+            with patch("mcp_bridge.DEFAULT_TEMP_DIR", Path(tmpdir)):
+                result = run_task_bridge(
+                    task="open Chrome",
+                    config_path=config_path,
+                    dry_run=True,
+                )
+
+            runtime_config = json.loads(
+                Path(result["runtime_config_path"]).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(runtime_config["brain_llm"]["api_key"], "$API_KEY")
+        self.assertEqual(runtime_config["brain_llm"]["base_url"], "$BASE_URL")
+
     @patch("mcp_bridge.subprocess.run")
     def test_run_task_bridge_dry_run_skips_subprocess(self, mock_run) -> None:
         result = run_task_bridge(task="open Chrome", dry_run=True)
@@ -131,6 +186,13 @@ class ExampleConfigTests(unittest.TestCase):
         self.assertIn("model_name", config["brain_llm"])
         self.assertIn("api_key", config["brain_llm"])
         self.assertIn("base_url", config["brain_llm"])
+
+    @patch.dict(os.environ, {"API_KEY": "sk-test", "BASE_URL": "https://example.test/v1"}, clear=True)
+    def test_get_example_config_expands_env_placeholders(self) -> None:
+        config = get_example_config()
+
+        self.assertEqual(config["brain_llm"]["api_key"], "sk-test")
+        self.assertEqual(config["brain_llm"]["base_url"], "https://example.test/v1")
 
 
 class MCPServerModuleTests(unittest.TestCase):

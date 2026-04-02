@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from config_env import resolve_env_placeholders
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "examples" / "config.json"
@@ -21,8 +23,7 @@ class BridgeInputError(ValueError):
 
 def get_example_config(config_path: str | Path | None = None) -> dict[str, Any]:
     path = _resolve_config_path(config_path)
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+    return _load_config(path, resolve_env=True)
 
 
 def build_runtime_config(
@@ -103,7 +104,7 @@ def run_task_bridge(
     if not task or not task.strip():
         raise BridgeInputError("task must not be empty")
 
-    base_config = get_example_config(config_path)
+    base_config = _load_config(_resolve_config_path(config_path), resolve_env=False)
     runtime_config = build_runtime_config(
         base_config,
         task=task,
@@ -216,6 +217,14 @@ def _resolve_config_path(config_path: str | Path | None) -> Path:
     if not path.is_absolute():
         path = (PROJECT_ROOT / path).resolve()
     return path
+
+
+def _load_config(path: Path, *, resolve_env: bool) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        config = json.load(handle)
+    if resolve_env:
+        return resolve_env_placeholders(config)
+    return config
 
 
 def _truncate_output(output: str | None, limit: int = DEFAULT_OUTPUT_LIMIT) -> str:
