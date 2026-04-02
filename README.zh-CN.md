@@ -38,7 +38,7 @@ TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
 ## 目录
 - [📞 联系方式与社区](#contact-community)
 - [🤖 OpenClaw 技能](#openclaw-skill)
-- [🧰 Codex MCP Server](#codex-mcp-server)
+- [🧰 Codex / OpenCode MCP](#codex-opencode-mcp)
 - [📰 最新动态](#latest-news)
 - [🖼️ 演示](#demos)
 - [✨ 关键特性](#key-features)
@@ -71,9 +71,11 @@ OpenClaw 的 Windows 本地技能包位于 `multi-agent-windows` 分支的 `Open
 
 ---
 
-## <a id="codex-mcp-server"></a>🧰 Codex MCP Server
+## <a id="codex-opencode-mcp"></a>🧰 Codex / OpenCode MCP
 
-本仓库现在包含一个本地 stdio MCP server 入口 `mcp_server.py`，这样 Codex 就可以把 TuriX 当成工具直接调用。
+本仓库现在包含一个本地 stdio MCP server 入口 `mcp_server.py`，这样 Codex、OpenCode 这类支持 MCP 的工具都可以把 TuriX 当成工具直接调用。
+
+### Codex
 
 典型安装方式：
 
@@ -92,6 +94,25 @@ codex mcp add turix -- python /path/to/TuriX-CUA/mcp_server.py
 - `resume_task`
 - `get_example_config`
 - `health_check`
+
+### OpenCode
+
+本仓库也附带了一个项目级 `opencode.json`，让 OpenCode 可以指向同一个 MCP server：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "turix": {
+      "type": "local",
+      "command": ["python", "mcp_server.py"],
+      "enabled": true
+    }
+  }
+}
+```
+
+如果你的 TuriX 环境不是默认的 `python`，请把 `command` 改成对应解释器。
 
 这个 MCP server 刻意保持很薄：它只负责准备临时配置，然后用同一个 Python 解释器启动现有的 `examples/main.py`。
 

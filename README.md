@@ -30,7 +30,7 @@ Prefer your own model? **Change in `config.json` and go.**
 ## Table of Contents
 - [📞 Contact & Community](#-contact--community)
 - [🤖 OpenClaw Skill](#-openclaw-skill)
-- [🧰 Codex MCP Server](#-codex-mcp-server)
+- [🧰 MCP for Codex & OpenCode](#-mcp-for-codex--opencode)
 - [📰 Latest News](#-latest-news)
 - [🖼️ Demos](#️-demos)
 - [✨ Key Features](#-key-features)
@@ -63,9 +63,11 @@ You can also instruct OpenClaw directly: read `OpenCLaw_TuriX_skill/README.md` f
 
 ---
 
-## 🧰 Codex MCP Server
+## 🧰 MCP for Codex & OpenCode
 
-This repository now includes a local stdio MCP server entrypoint at `mcp_server.py` so Codex can call TuriX directly as a tool.
+This repository now includes a local stdio MCP server entrypoint at `mcp_server.py` so MCP-aware tools such as Codex and OpenCode can call TuriX directly.
+
+### Codex
 
 Typical setup:
 
@@ -84,6 +86,25 @@ Primary tools exposed by this server:
 - `resume_task`
 - `get_example_config`
 - `health_check`
+
+### OpenCode
+
+This repo also includes a project-local `opencode.json` that points OpenCode at the same MCP server:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "turix": {
+      "type": "local",
+      "command": ["python", "mcp_server.py"],
+      "enabled": true
+    }
+  }
+}
+```
+
+If your TuriX environment uses a different Python executable, update the `command` array accordingly.
 
 The MCP server is intentionally thin: it prepares a temporary config, then launches the existing `examples/main.py` entrypoint with the same Python interpreter.
 

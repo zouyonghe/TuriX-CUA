@@ -121,6 +121,14 @@ class ExampleConfigTests(unittest.TestCase):
         self.assertIn("agent", config)
         self.assertIn("task", config["agent"])
 
+    def test_example_config_preserves_upstream_placeholder_llm_settings(self) -> None:
+        config = get_example_config()
+
+        self.assertEqual(config["brain_llm"]["provider"], "turix")
+        self.assertEqual(config["brain_llm"]["model_name"], "turix-brain")
+        self.assertEqual(config["brain_llm"]["api_key"], "your_api_key_here")
+        self.assertEqual(config["brain_llm"]["base_url"], "https://turixapi.io/v1")
+
 
 class MCPServerModuleTests(unittest.TestCase):
     def test_mcp_server_exposes_tool_functions(self) -> None:
@@ -130,6 +138,17 @@ class MCPServerModuleTests(unittest.TestCase):
         self.assertTrue(callable(mcp_server.resume_task))
         self.assertTrue(callable(mcp_server.get_example_config_tool))
         self.assertTrue(callable(mcp_server.health_check_tool))
+
+
+class OpenCodeConfigTests(unittest.TestCase):
+    def test_opencode_config_uses_portable_local_command(self) -> None:
+        config_path = Path(__file__).resolve().parent.parent / "opencode.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+
+        turix = config["mcp"]["turix"]
+        self.assertEqual(turix["type"], "local")
+        self.assertEqual(turix["command"], ["python", "mcp_server.py"])
+        self.assertTrue(turix["enabled"])
 
 
 if __name__ == "__main__":
