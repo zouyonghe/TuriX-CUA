@@ -274,40 +274,45 @@ Edit task in `examples/config.json`:
 
 #### 4.2 Edit API Configuration
 
-Get API now with $20 credit from our [official web page](https://turix.ai/api-platform/).
-Login to our website and the key is at the bottom.
+The example config supports shell-style environment placeholders. Values like `$API_KEY` and `$BASE_URL`
+are expanded at runtime, so you can keep secrets out of the repository.
 
-In this main (multi-agent) branch, you need to set the brain, actor, and memory models. It only supports mac for now. If you enable planning
-(`agent.use_plan: true`), you also need to set the planner model.
-We strongly recommand you to set the turix-actor model as the actor. The brain can be any VLMs you like, we provide qwen3.5vl in our platform. Gemini-3-pro is tested to be smartest, and Gemini-3-flash is fast and smart enough for most of the tasks. 
+Export the variables before you run TuriX:
 
-Edit API in `examples/config.json`:
+```bash
+export API_KEY="your_api_key"
+export BASE_URL="https://your-openai-compatible-endpoint/v1"
+```
+
+Then edit `examples/config.json`:
 ```json
 "brain_llm": {
-      "provider": "turix",
-      "model_name": "turix-brain",
-      "api_key": "YOUR_API_KEY",
-      "base_url": "https://turixapi.io/v1"
+      "provider": "gpt",
+      "model_name": "gpt-5.4",
+      "api_key": "$API_KEY",
+      "base_url": "$BASE_URL"
    },
 "actor_llm": {
-      "provider": "turix",
-      "model_name": "turix-actor",
-      "api_key": "YOUR_API_KEY",
-      "base_url": "https://turixapi.io/v1"
+      "provider": "gpt",
+      "model_name": "gpt-5.4",
+      "api_key": "$API_KEY",
+      "base_url": "$BASE_URL"
    },
 "memory_llm": {
-      "provider": "turix",
-      "model_name": "turix-brain",
-      "api_key": "YOUR_API_KEY",
-      "base_url": "https://turixapi.io/v1"
+      "provider": "gpt",
+      "model_name": "gpt-5.4",
+      "api_key": "$API_KEY",
+      "base_url": "$BASE_URL"
    },
 "planner_llm": {
-      "provider": "turix",
-      "model_name": "turix-brain",
-      "api_key": "YOUR_API_KEY",
-      "base_url": "https://turixapi.io/v1"
+      "provider": "gpt",
+      "model_name": "gpt-5.4",
+      "api_key": "$API_KEY",
+      "base_url": "$BASE_URL"
    }
 ```
+
+If a placeholder variable is unset, TuriX treats that field as missing and falls back to the usual runtime validation.
 
 For a local Ollama setup, point each role to your Ollama server:
 ```json

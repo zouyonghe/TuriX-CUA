@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,7 @@ from mcp_bridge import (
     run_task_bridge,
     write_runtime_config,
 )
+from config_env import resolve_env_placeholders
 
 
 class BuildRuntimeConfigTests(unittest.TestCase):
@@ -121,13 +123,14 @@ class ExampleConfigTests(unittest.TestCase):
         self.assertIn("agent", config)
         self.assertIn("task", config["agent"])
 
-    def test_example_config_preserves_upstream_placeholder_llm_settings(self) -> None:
+    def test_get_example_config_returns_brain_llm_fields(self) -> None:
         config = get_example_config()
 
-        self.assertEqual(config["brain_llm"]["provider"], "turix")
-        self.assertEqual(config["brain_llm"]["model_name"], "turix-brain")
-        self.assertEqual(config["brain_llm"]["api_key"], "your_api_key_here")
-        self.assertEqual(config["brain_llm"]["base_url"], "https://turixapi.io/v1")
+        self.assertIn("brain_llm", config)
+        self.assertIn("provider", config["brain_llm"])
+        self.assertIn("model_name", config["brain_llm"])
+        self.assertIn("api_key", config["brain_llm"])
+        self.assertIn("base_url", config["brain_llm"])
 
 
 class MCPServerModuleTests(unittest.TestCase):
@@ -149,6 +152,36 @@ class OpenCodeConfigTests(unittest.TestCase):
         self.assertEqual(turix["type"], "local")
         self.assertEqual(turix["command"], ["python", "mcp_server.py"])
         self.assertTrue(turix["enabled"])
+
+
+class ConfigEnvPlaceholderTests(unittest.TestCase):
+    @patch.dict(os.environ, {"API_KEY": "sk-test", "BASE_URL": "https://example.test/v1"}, clear=True)
+    def test_resolve_env_placeholders_expands_nested_values(self) -> None:
+        config = {
+            "brain_llm": {
+                "api_key": "$API_KEY",
+                "base_url": "${BASE_URL}",
+            },
+            "agent": {
+                "task": "demo",
+                "tags": ["$API_KEY", "literal"],
+            },
+        }
+
+        resolved = resolve_env_placeholders(config)
+
+        self.assertEqual(resolved["brain_llm"]["api_key"], "sk-test")
+        self.assertEqual(resolved["brain_llm"]["base_url"], "https://example.test/v1")
+        self.assertEqual(resolved["agent"]["tags"][0], "sk-test")
+        self.assertEqual(resolved["agent"]["tags"][1], "literal")
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_resolve_env_placeholders_maps_missing_values_to_none(self) -> None:
+        config = {"brain_llm": {"api_key": "$MISSING_API_KEY"}}
+
+        resolved = resolve_env_placeholders(config)
+
+        self.assertIsNone(resolved["brain_llm"]["api_key"])
 
 
 if __name__ == "__main__":

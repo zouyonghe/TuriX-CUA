@@ -7,6 +7,7 @@ from pynput import keyboard
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from config_env import resolve_env_placeholders
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_anthropic import ChatAnthropic
@@ -70,7 +71,7 @@ def load_config(path: Path) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Config file {path} not found.")
     with path.open("r", encoding="utf-8") as fp:
-        return json.load(fp)
+        return resolve_env_placeholders(json.load(fp))
 
 def normalize_hotkey(hotkey: str) -> str:
     if not hotkey:
