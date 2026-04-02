@@ -252,7 +252,14 @@ def build_llm(cfg: dict, *, enable_thinking: bool | None = None):
         ollama_kwargs = {"model": model_name, "temperature": 0.3}
         if base_url:
             ollama_kwargs["base_url"] = base_url
-        return ChatOllama(**ollama_kwargs)
+        llm = ChatOllama(**ollama_kwargs)
+        return configure_llm_capabilities(
+            llm,
+            supports_tool_calling=bool(cfg.get("supports_tool_calling", True)),
+            # Disabled by default because some Ollama model/runtime combos fail with:
+            # "failed to load model vocabulary required for format"
+            supports_response_format=bool(cfg.get("supports_response_format", False)),
+        )
 
     if provider == "google_flash":
         return ChatGoogleGenerativeAI(
