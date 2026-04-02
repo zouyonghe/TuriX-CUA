@@ -4,7 +4,9 @@ from typing import Any
 
 from mcp_bridge import (
     BridgeInputError,
+    cancel_task_bridge,
     get_example_config,
+    get_task_status_bridge,
     health_check,
     resume_task_bridge,
     run_task_bridge,
@@ -77,6 +79,22 @@ def resume_task(
         return _error_result(exc)
 
 
+def get_task_status(job_id: str) -> dict[str, Any]:
+    """Return the persisted status for a tracked TuriX MCP job."""
+    try:
+        return get_task_status_bridge(job_id=job_id)
+    except BridgeInputError as exc:
+        return _error_result(exc)
+
+
+def cancel_task(job_id: str) -> dict[str, Any]:
+    """Request cancellation for a tracked TuriX MCP job."""
+    try:
+        return cancel_task_bridge(job_id=job_id)
+    except BridgeInputError as exc:
+        return _error_result(exc)
+
+
 def get_example_config_tool(config_path: str | None = None) -> dict[str, Any]:
     """Return the current example config so Codex can inspect the local setup."""
     try:
@@ -104,6 +122,8 @@ if FastMCP is not None:
     )
     mcp.tool()(run_task)
     mcp.tool()(resume_task)
+    mcp.tool()(get_task_status)
+    mcp.tool()(cancel_task)
     mcp.tool(name="get_example_config")(get_example_config_tool)
     mcp.tool(name="health_check")(health_check_tool)
 else:  # pragma: no cover - exercised in local startup checks

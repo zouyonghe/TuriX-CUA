@@ -17,6 +17,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 from src import Agent
 from src.controller.service import Controller
+from job_status import build_progress_update, update_status
 
 
 class CompatChatOpenAI(ChatOpenAI):
@@ -53,9 +54,13 @@ class CompatChatOpenAI(ChatOpenAI):
                             for nested_key, nested_value in value.items():
                                 if nested_value is None:
                                     continue
-                                merged[nested_key] = merged.get(nested_key, 0) + nested_value
+                                merged[nested_key] = (
+                                    merged.get(nested_key, 0) + nested_value
+                                )
                             overall_token_usage[key] = merged
-                        elif isinstance(current, (int, float)) and isinstance(value, (int, float)):
+                        elif isinstance(current, (int, float)) and isinstance(
+                            value, (int, float)
+                        ):
                             overall_token_usage[key] = current + value
                         else:
                             overall_token_usage[key] = value
@@ -70,6 +75,7 @@ class CompatChatOpenAI(ChatOpenAI):
             combined["system_fingerprint"] = system_fingerprint
         return combined
 
+
 # ---------- Utilities -------------------------------------------------------
 def has_screen_capture_permission() -> bool:
     CoreGraphics = ctypes.cdll.LoadLibrary(
@@ -77,12 +83,13 @@ def has_screen_capture_permission() -> bool:
     )
     return bool(CoreGraphics.CGPreflightScreenCaptureAccess())
 
+
 LOG_LEVEL_MAP = {
     "CRITICAL": logging.CRITICAL,
-    "ERROR":    logging.ERROR,
-    "WARNING":  logging.WARNING,
-    "INFO":     logging.INFO,
-    "DEBUG":    logging.DEBUG,
+    "ERROR": logging.ERROR,
+    "WARNING": logging.WARNING,
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
 }
 
 HOTKEY_ALIASES = {
@@ -95,6 +102,7 @@ HOTKEY_ALIASES = {
     "alt": "<alt>",
     "opt": "<alt>",
 }
+
 
 def resolve_output_dir(cfg: dict, config_path: Path) -> Path:
     output_dir = (
@@ -111,6 +119,7 @@ def resolve_output_dir(cfg: dict, config_path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     return path
 
+
 def resolve_artifact_path(raw_path: str | None, output_dir: Path) -> str | None:
     if not raw_path:
         return None
@@ -121,11 +130,22 @@ def resolve_artifact_path(raw_path: str | None, output_dir: Path) -> str | None:
         path.parent.mkdir(parents=True, exist_ok=True)
     return str(path)
 
+
+def resolve_job_status_path(raw_path: str | None, config_path: Path) -> Path | None:
+    if not raw_path:
+        return None
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute():
+        path = (config_path.parent / path).resolve()
+    return path
+
+
 def load_config(path: Path) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Config file {path} not found.")
     with path.open("r", encoding="utf-8") as fp:
         return resolve_env_placeholders(json.load(fp))
+
 
 def normalize_hotkey(hotkey: str) -> str:
     if not hotkey:
@@ -142,6 +162,7 @@ def normalize_hotkey(hotkey: str) -> str:
         else:
             normalized.append(lower)
     return "+".join(normalized)
+
 
 def register_force_stop_hotkey(
     loop: asyncio.AbstractEventLoop,
@@ -164,7 +185,9 @@ def register_force_stop_hotkey(
     return listener
 
 
-def configure_llm_capabilities(llm, *, supports_tool_calling: bool, supports_response_format: bool):
+def configure_llm_capabilities(
+    llm, *, supports_tool_calling: bool, supports_response_format: bool
+):
     setattr(llm, "_turix_supports_tool_calling", supports_tool_calling)
     setattr(llm, "_turix_supports_response_format", supports_response_format)
     return llm
@@ -246,9 +269,10 @@ def build_openai_compatible_llm(
         supports_response_format=effective_supports_response_format,
     )
 
+
 def build_llm(cfg: dict, *, enable_thinking: bool | None = None):
     provider = cfg["provider"].lower()
-    api_key  = cfg.get("api_key") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
+    api_key = cfg.get("api_key") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
     model_name = cfg.get("model_name")
     base_url = cfg.get("base_url")
     model_kwargs = _merge_model_kwargs(cfg, enable_thinking=enable_thinking)
@@ -319,7 +343,7 @@ def build_llm(cfg: dict, *, enable_thinking: bool | None = None):
         return ChatGoogleGenerativeAI(
             model="gemini-2.5-flash", api_key=api_key, temperature=0.3
         )
-    
+
     if provider == "gpt":
         return build_openai_compatible_llm(
             model_name=model_name or "gpt-4.1-mini",
@@ -341,18 +365,23 @@ def build_llm(cfg: dict, *, enable_thinking: bool | None = None):
 
     raise ValueError(f"Unknown llm provider '{provider}'")
 
+
 # ---------- Main ------------------------------------------------------------
 def main(config_path: str = "config.json"):
     # Make config path relative to script location if it's a relative path
     if not Path(config_path).is_absolute():
         config_path = Path(__file__).parent / config_path
-    
-    cfg = load_config(Path(config_path))
-    output_dir = resolve_output_dir(cfg, Path(config_path))
+
+    config_path = Path(config_path)
+    cfg = load_config(config_path)
+    output_dir = resolve_output_dir(cfg, config_path)
+    job_status_path = resolve_job_status_path(cfg.get("job_status_path"), config_path)
     brain_enable_thinking = cfg.get("brain_enable_thinking")
     if not isinstance(brain_enable_thinking, bool):
         thinking_cfg = cfg.get("thinking")
-        if isinstance(thinking_cfg, dict) and isinstance(thinking_cfg.get("brain"), bool):
+        if isinstance(thinking_cfg, dict) and isinstance(
+            thinking_cfg.get("brain"), bool
+        ):
             brain_enable_thinking = thinking_cfg.get("brain")
         else:
             brain_enable_thinking = False
@@ -361,29 +390,33 @@ def main(config_path: str = "config.json"):
     log_level_str = cfg.get("logging_level", "DEBUG").upper()
     use_plan = cfg.get("agent", {}).get("use_plan", False)
     logging_level = LOG_LEVEL_MAP.get(log_level_str, logging.DEBUG)
-    
+
     # Configure root logger first
     logging.basicConfig(
         level=logging_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
             logging.StreamHandler(),  # Console output
-            RotatingFileHandler(str(output_dir / "logging.log"), maxBytes=20 * 1024 * 1024, backupCount=3)
+            RotatingFileHandler(
+                str(output_dir / "logging.log"),
+                maxBytes=20 * 1024 * 1024,
+                backupCount=3,
+            ),
         ],
         force=True,
     )
-    
+
     # Set up specific logger
     log = logging.getLogger("turix")
     log.handlers.clear()
     log.propagate = True
     log.setLevel(logging_level)
-    
+
     # Also set logging for other relevant modules
     logging.getLogger("src").setLevel(logging_level)
     logging.getLogger("src.agent").setLevel(logging_level)
     logging.getLogger("src.agent.message_manager").setLevel(logging_level)
-    
+
     print(f"Logging level set to: {log_level_str}")
 
     # --- Permissions check -------------------------------------------------
@@ -435,38 +468,87 @@ def main(config_path: str = "config.json"):
     )
 
     agent = Agent(
-        task                    = agent_cfg["task"],
-        brain_llm               = brain_llm,
-        actor_llm               = actor_llm,
-        planner_llm             = planner_llm,
-        memory_llm              = memory_llm,
-        memory_budget           = agent_cfg.get("memory_budget", 500),
-        summary_memory_budget   = agent_cfg.get("summary_memory_budget"),
-        controller              = controller,
-        use_ui                  = agent_cfg.get("use_ui", False),
-        use_search              = agent_cfg.get("use_search", True),
-        use_skills              = agent_cfg.get("use_skills", False),
-        skills_dir              = str(skills_dir) if skills_dir else None,
-        skills_max_chars         = agent_cfg.get("skills_max_chars", 4000),
-        max_actions_per_step    = agent_cfg.get("max_actions_per_step", 5),
-        resume                  = agent_cfg.get("resume", False),
-        agent_id                = agent_cfg.get("agent_id"),
-        save_brain_conversation_path  = save_brain_conversation_path,
-        save_brain_conversation_path_encoding = agent_cfg.get("save_brain_conversation_path_encoding", "utf-8"),
-        save_actor_conversation_path  = save_actor_conversation_path,
-        save_actor_conversation_path_encoding = agent_cfg.get("save_actor_conversation_path_encoding", "utf-8"),
-        save_planner_conversation_path = save_planner_conversation_path,
-        save_planner_conversation_path_encoding = agent_cfg.get("save_planner_conversation_path_encoding", "utf-8"),
-        artifacts_dir           = str(output_dir),
+        task=agent_cfg["task"],
+        brain_llm=brain_llm,
+        actor_llm=actor_llm,
+        planner_llm=planner_llm,
+        memory_llm=memory_llm,
+        memory_budget=agent_cfg.get("memory_budget", 500),
+        summary_memory_budget=agent_cfg.get("summary_memory_budget"),
+        controller=controller,
+        use_ui=agent_cfg.get("use_ui", False),
+        use_search=agent_cfg.get("use_search", True),
+        use_skills=agent_cfg.get("use_skills", False),
+        skills_dir=str(skills_dir) if skills_dir else None,
+        skills_max_chars=agent_cfg.get("skills_max_chars", 4000),
+        max_actions_per_step=agent_cfg.get("max_actions_per_step", 5),
+        resume=agent_cfg.get("resume", False),
+        agent_id=agent_cfg.get("agent_id"),
+        save_brain_conversation_path=save_brain_conversation_path,
+        save_brain_conversation_path_encoding=agent_cfg.get(
+            "save_brain_conversation_path_encoding", "utf-8"
+        ),
+        save_actor_conversation_path=save_actor_conversation_path,
+        save_actor_conversation_path_encoding=agent_cfg.get(
+            "save_actor_conversation_path_encoding", "utf-8"
+        ),
+        save_planner_conversation_path=save_planner_conversation_path,
+        save_planner_conversation_path_encoding=agent_cfg.get(
+            "save_planner_conversation_path_encoding", "utf-8"
+        ),
+        artifacts_dir=str(output_dir),
     )
+
+    def publish_job_progress(_state, model_output, step: int) -> None:
+        if job_status_path is None:
+            return
+        try:
+            update_status(
+                job_status_path,
+                **build_progress_update(
+                    agent=agent,
+                    model_output=model_output,
+                    step=step,
+                ),
+            )
+        except Exception:
+            log.exception("Failed to publish job progress to %s", job_status_path)
+
+    def publish_job_done(history) -> None:
+        if job_status_path is None:
+            return
+        last_model_output = (
+            history.history[-1].model_output if history.history else None
+        )
+        try:
+            update_status(
+                job_status_path,
+                **build_progress_update(
+                    agent=agent,
+                    model_output=last_model_output,
+                    step=len(history.history),
+                ),
+            )
+        except Exception:
+            log.exception("Failed to publish final job progress to %s", job_status_path)
+
+    agent.register_new_step_callback = publish_job_progress
+    agent.register_done_callback = publish_job_done
+
+    if job_status_path is not None:
+        publish_job_progress(None, None, 0)
 
     async def runner():
         loop = asyncio.get_running_loop()
-        agent_task = asyncio.create_task(agent.run(max_steps=agent_cfg.get("max_steps", 100)))
+        agent_task = asyncio.create_task(
+            agent.run(max_steps=agent_cfg.get("max_steps", 100))
+        )
         listener = None
         if force_stop_hotkey:
             try:
-                listener = register_force_stop_hotkey(loop, agent, agent_task, force_stop_hotkey, log)
+                listener = register_force_stop_hotkey(
+                    loop, agent, agent_task, force_stop_hotkey, log
+                )
                 log.info("Force-stop hotkey registered: %s", force_stop_hotkey)
             except Exception:
                 log.exception("Failed to register force-stop hotkey: %s", raw_hotkey)
@@ -479,6 +561,7 @@ def main(config_path: str = "config.json"):
                 listener.stop()
 
     asyncio.run(runner())
+
 
 # ---------- CLI -------------------------------------------------------------
 if __name__ == "__main__":
