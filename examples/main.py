@@ -12,9 +12,63 @@ from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_anthropic import ChatAnthropic
 from langchain_ollama import ChatOllama
+from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 
 from src import Agent
 from src.controller.service import Controller
+
+
+class CompatChatOpenAI(ChatOpenAI):
+    def _create_chat_result(self, response, generation_info=None):
+        if isinstance(response, str):
+            return ChatResult(
+                generations=[
+                    ChatGeneration(
+                        message=AIMessage(content=response),
+                        generation_info=generation_info or {},
+                    )
+                ],
+                llm_output={"token_usage": {}},
+            )
+        return super()._create_chat_result(response, generation_info)
+
+    def _combine_llm_outputs(self, llm_outputs):
+        overall_token_usage = {}
+        system_fingerprint = None
+
+        for output in llm_outputs:
+            if output is None:
+                continue
+
+            token_usage = output.get("token_usage")
+            if token_usage:
+                for key, value in token_usage.items():
+                    if value is None:
+                        continue
+                    if key in overall_token_usage:
+                        current = overall_token_usage[key]
+                        if isinstance(current, dict) and isinstance(value, dict):
+                            merged = dict(current)
+                            for nested_key, nested_value in value.items():
+                                if nested_value is None:
+                                    continue
+                                merged[nested_key] = merged.get(nested_key, 0) + nested_value
+                            overall_token_usage[key] = merged
+                        elif isinstance(current, (int, float)) and isinstance(value, (int, float)):
+                            overall_token_usage[key] = current + value
+                        else:
+                            overall_token_usage[key] = value
+                    else:
+                        overall_token_usage[key] = value
+
+            if system_fingerprint is None:
+                system_fingerprint = output.get("system_fingerprint")
+
+        combined = {"token_usage": overall_token_usage, "model_name": self.model_name}
+        if system_fingerprint:
+            combined["system_fingerprint"] = system_fingerprint
+        return combined
 
 # ---------- Utilities -------------------------------------------------------
 def has_screen_capture_permission() -> bool:
@@ -166,6 +220,12 @@ def build_openai_compatible_llm(
 ):
     if not model_name:
         raise ValueError("OpenAI-compatible provider requires 'model_name'.")
+    effective_supports_response_format = supports_response_format
+    normalized_base_url = (base_url or "").lower()
+    if normalized_base_url and "api.openai.com" not in normalized_base_url:
+        # Many OpenAI-compatible gateways mishandle beta.chat.completions.parse /
+        # response_format. Fall back to prompt-only JSON for those endpoints.
+        effective_supports_response_format = False
     kwargs = {
         "model": model_name,
         "openai_api_key": api_key,
@@ -179,11 +239,11 @@ def build_openai_compatible_llm(
         kwargs["max_tokens"] = max_tokens
     if timeout is not None:
         kwargs["timeout"] = timeout
-    llm = ChatOpenAI(**kwargs)
+    llm = CompatChatOpenAI(**kwargs)
     return configure_llm_capabilities(
         llm,
         supports_tool_calling=supports_tool_calling,
-        supports_response_format=supports_response_format,
+        supports_response_format=effective_supports_response_format,
     )
 
 def build_llm(cfg: dict, *, enable_thinking: bool | None = None):

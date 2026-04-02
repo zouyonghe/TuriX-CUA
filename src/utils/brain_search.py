@@ -10,6 +10,7 @@ from langchain_core.messages import BaseMessage
 
 from src.agent.message_manager.service import MessageManager
 from src.utils.record_store import RecordStore
+from src.utils.llm_response import normalize_llm_json_text
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,7 @@ class BrainSearchFlow:
         return None
 
     def parse_response(self, text: str, label: str = "Brain") -> dict:
-        cleaned = re.sub(r"^```(json)?", "", text.strip())
-        cleaned = re.sub(r"```$", "", cleaned).strip()
+        cleaned = normalize_llm_json_text(text)
         logger.debug("[%s] Raw text: %s", label, cleaned)
         return json.loads(cleaned)
 

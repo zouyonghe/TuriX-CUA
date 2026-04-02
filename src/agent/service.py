@@ -9,6 +9,7 @@ from pathlib import Path
 import Quartz
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 import re
+from urllib.parse import quote
 from datetime import datetime
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -43,8 +44,10 @@ from src.agent.views import (
     AgentStepInfo,
     AgentBrain
 )
+from src.controller.registry.views import ActionModel
 from src.utils.record_store import RecordStore
 from src.utils.brain_search import BrainSearchFlow
+from src.utils.llm_response import normalize_llm_json_text
 from src.utils.skills import (
     load_skill_metadata,
     load_skill_contents,
@@ -78,11 +81,199 @@ def _default_agent_id(task: str, now: datetime) -> str:
     slug = _task_to_slug(task)
     return f"{date_str}_{slug}"
 
-def screenshot_to_dataurl(screenshot):
+def screenshot_to_dataurl(screenshot, *, max_width: int = 1024, jpeg_quality: int = 60):
+    image = screenshot.copy()
+    if image.width > max_width:
+        ratio = max_width / image.width
+        image = image.resize((int(image.width * ratio), int(image.height * ratio)))
+
+    if image.mode in ("RGBA", "LA"):
+        background = Image.new("RGB", image.size, "white")
+        background.paste(image, mask=image.getchannel("A"))
+        image = background
+    elif image.mode != "RGB":
+        image = image.convert("RGB")
+
     img_byte_arr = io.BytesIO()
-    screenshot.save(img_byte_arr, format='PNG')
-    base64_encoded = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-    return f'data:image/png;base64,{base64_encoded}'
+    image.save(img_byte_arr, format="JPEG", quality=jpeg_quality, optimize=True)
+    base64_encoded = base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
+    return f"data:image/jpeg;base64,{base64_encoded}"
+
+
+def strip_premature_done_actions(actions: list[Any]) -> list[Any]:
+    if len(actions) <= 1:
+        return actions
+
+    filtered_actions = []
+    removed_done = False
+    for action in actions:
+        payload = action.model_dump(exclude_unset=True) if hasattr(action, "model_dump") else action
+        if list(payload.keys()) == ["done"]:
+            removed_done = True
+            continue
+        filtered_actions.append(action)
+
+    if removed_done:
+        logger.warning(
+            "Dropping trailing/combined done action because task completion must be verified in a later step."
+        )
+
+    return filtered_actions or actions
+
+
+def _extract_google_images_query(task: str, next_goal: str) -> Optional[str]:
+    combined = f"{task}\n{next_goal}"
+
+    quoted_patterns = [
+        r'search for ["“”\'「『]([^"“”\'」』]+)["“”\'」』]\s+images?',
+        r"results page for\s+['\"“”「『]?([^\"“”'」』\n,.]+)['\"“”」』]?",
+        r"page for\s+['\"“”「『]?([^\"“”'」』\n,.]+)['\"“”」』]?",
+        r"for\s+['\"“”「『]?([^\"“”'」』\n,.]+)['\"“”」』]?\s+images",
+    ]
+    for pattern in quoted_patterns:
+        match = re.search(pattern, combined, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+
+    google_query_patterns = [
+        r"google search results page for\s+([^\n,.]+)",
+        r"google images results for\s+([^\n,.]+)",
+        r"current query\s+(?!to\b|and\b|in\b|on\b)([^\n,.]+?)(?:\s+(?:and|to|in|on)\b|[.,\n]|$)",
+    ]
+    for pattern in google_query_patterns:
+        match = re.search(pattern, combined, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip(" '\"“”「」『』")
+
+    return None
+
+
+def _detect_browser_app(task: str, next_goal: str) -> str:
+    combined = f"{task}\n{next_goal}".lower()
+    if "google chrome" in combined or re.search(r"\bchrome\b", combined):
+        return "Google Chrome"
+    if "safari" in combined:
+        return "Safari"
+    return "Safari"
+
+
+def _is_google_images_navigation_request(task: str, next_goal: str) -> bool:
+    task_text = task.lower()
+    task_markers = (
+        "google images",
+        "tbm=isch",
+        "image thumbnails",
+        "image results",
+        "images results",
+        "search for",
+        "图片",
+        "画像",
+    )
+    if any(marker in task_text for marker in task_markers):
+        if "search for" in task_text and "images" not in task_text and "google images" not in task_text:
+            return False
+        return True
+    return False
+
+
+def _build_google_images_applescript(query: Optional[str], browser_app: str) -> str:
+    if query:
+        encoded_query = quote(query, safe="")
+        if browser_app == "Google Chrome":
+            return (
+                'tell application "Google Chrome"\n'
+                "    activate\n"
+                "    delay 0.2\n"
+                "    if (count of windows) = 0 then make new window\n"
+                f'    set URL of active tab of front window to "https://www.google.com/search?tbm=isch&q={encoded_query}"\n'
+                "end tell"
+            )
+        return (
+            'tell application "Safari"\n'
+            "    activate\n"
+            "    delay 0.2\n"
+            "    if (count of documents) = 0 then make new document\n"
+            f'    set URL of front document to "https://www.google.com/search?tbm=isch&q={encoded_query}"\n'
+            "end tell"
+        )
+
+    if browser_app == "Google Chrome":
+        return (
+            'tell application "Google Chrome"\n'
+            "    activate\n"
+            "    delay 0.2\n"
+            "    if (count of windows) = 0 then error \"No Google Chrome window available to derive the current Google query.\"\n"
+            "    execute active tab of front window javascript \"(() => { const fromInput = document.querySelector('input[name=\\\"q\\\"]')?.value || ''; "
+            "let fromUrl = ''; try { fromUrl = new URL(window.location.href).searchParams.get('q') || ''; } catch (e) {} "
+            "const q = fromInput || fromUrl; if (!q) { throw new Error('No query available'); } "
+            "window.location.href = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(q); return q; })();\"\n"
+            "end tell"
+        )
+
+    return (
+        'tell application "Safari"\n'
+        "    activate\n"
+        "    delay 0.2\n"
+        "    if (count of documents) = 0 then error \"No Safari document available to derive the current Google query.\"\n"
+        "    do JavaScript \"(() => { const fromInput = document.querySelector('input[name=\\\"q\\\"]')?.value || ''; "
+        "let fromUrl = ''; try { fromUrl = new URL(window.location.href).searchParams.get('q') || ''; } catch (e) {} "
+        "const q = fromInput || fromUrl; if (!q) { throw new Error('No query available'); } "
+        "window.location.href = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(q); return q; })();\" in front document\n"
+        "end tell"
+    )
+
+
+def build_google_images_fallback_actions(
+    *,
+    task: str,
+    next_goal: str,
+) -> Optional[list[ActionModel]]:
+    if not _is_google_images_navigation_request(task, next_goal):
+        return None
+    if next_goal.strip().lower().startswith("stop"):
+        return [ActionModel.model_validate({"done": {}})]
+
+    query = _extract_google_images_query(task, next_goal)
+    browser_app = _detect_browser_app(task, next_goal)
+    script = _build_google_images_applescript(query, browser_app)
+    logger.warning(
+        "Using deterministic Google Images fallback in %s%s.",
+        browser_app,
+        f" for query '{query}'" if query else " using the current page query",
+    )
+    return [
+        ActionModel.model_validate({"run_apple_script": {"script": script}}),
+        ActionModel.model_validate({"wait": {}}),
+    ]
+
+
+def rewrite_google_images_navigation_actions(
+    actions: list[Any],
+    *,
+    task: str,
+    next_goal: str,
+) -> list[Any]:
+    if not actions or not _is_google_images_navigation_request(task, next_goal):
+        return actions
+
+    action_payloads = [
+        action.model_dump(exclude_unset=True) if hasattr(action, "model_dump") else action
+        for action in actions
+    ]
+    action_names = [next(iter(payload.keys()), "") for payload in action_payloads if isinstance(payload, dict)]
+    if action_names == ["done"]:
+        if next_goal.strip():
+            return actions
+        fallback_actions = build_google_images_fallback_actions(task=task, next_goal=task)
+        return fallback_actions or actions
+    if "run_apple_script" in action_names:
+        return actions
+
+    fallback_actions = build_google_images_fallback_actions(task=task, next_goal=next_goal)
+    if fallback_actions is None:
+        return actions
+    logger.warning("Rewriting Google Images navigation step to deterministic Safari AppleScript.")
+    return fallback_actions
 
 def _llm_identity_text(llm: Optional[BaseChatModel]) -> str:
     if llm is None:
@@ -104,10 +295,22 @@ def llm_supports_response_format(llm: Optional[BaseChatModel]) -> bool:
     if explicit is not None:
         return bool(explicit)
 
-    if isinstance(llm, (ChatOpenAI, AzureChatOpenAI)):
+    if isinstance(llm, AzureChatOpenAI):
+        return True
+
+    if isinstance(llm, ChatOpenAI):
         identity = _llm_identity_text(llm)
         unsupported_tokens = ("deepseek", "minimax", "m2.5", "moonshot", "kimi")
-        return not any(token in identity for token in unsupported_tokens)
+        if any(token in identity for token in unsupported_tokens):
+            return False
+
+        base_url = str(
+            getattr(llm, "openai_api_base", "") or getattr(llm, "base_url", "") or ""
+        ).lower()
+        if base_url and "api.openai.com" not in base_url:
+            return False
+
+        return True
     return True
 
 
@@ -685,12 +888,12 @@ class Agent:
                 if step_id >= 2 and previous_screenshot_dataurl:
                     state_content.append({
                         "type": "image_url",
-                        "image_url": {"url": previous_screenshot_dataurl},
+                        "image_url": {"url": previous_screenshot_dataurl, "detail": "low"},
                     })
                 if screenshot_dataurl:
                     state_content.append({
                         "type": "image_url",
-                        "image_url": {"url": screenshot_dataurl},
+                        "image_url": {"url": screenshot_dataurl, "detail": "low"},
                     })
                 return state_content
 
@@ -701,8 +904,12 @@ class Agent:
             self.brain_message_manager.add_state_message(state_content)
             brain_messages = self.brain_message_manager.get_messages()
             
-            response = await self.brain_llm.ainvoke(brain_messages)
-            parsed = self.brain_search.parse_response(str(response.content))
+            response, brain_text = await self._ainvoke_json_text(
+                self.brain_llm,
+                brain_messages,
+                label="Brain",
+            )
+            parsed = self.brain_search.parse_response(brain_text)
             parsed, brain_messages = await self.brain_search.maybe_reinvoke(
                 parsed,
                 build_state_content,
@@ -788,7 +995,7 @@ class Agent:
                         },
                         {
                             "type": "image_url",
-                            "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated)},
+                            "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated), "detail": "low"},
                         }
                     ]
                 else:
@@ -802,7 +1009,7 @@ class Agent:
                         },
                         {
                             "type": "image_url",
-                            "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated)},
+                            "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated), "detail": "low"},
                         }
                     ]
             else:
@@ -813,7 +1020,7 @@ class Agent:
                     },
                     {
                         "type": "image_url",
-                        "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated)},
+                        "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated), "detail": "low"},
                     }
                 ]
             self.actor_message_manager._remove_last_AIntool_message()
@@ -911,10 +1118,27 @@ class Agent:
         Build a 'structured_llm' approach on top of self.llm. 
         Using the dynamic self.AgentOutput
         """        
-        response: dict[str, Any] = await self.actor_llm.ainvoke(input_messages)
+        try:
+            response, record = await self._ainvoke_json_text(
+                self.actor_llm,
+                input_messages,
+                label="Actor",
+            )
+        except ValueError as exc:
+            fallback_actions = build_google_images_fallback_actions(
+                task=self.task,
+                next_goal=self.next_goal or self.task,
+            )
+            if fallback_actions is None:
+                raise
+            logger.warning("Actor LLM returned no usable content; applying deterministic Google Images fallback.")
+            parsed = AgentOutput(action=fallback_actions)
+            self._log_response(parsed)
+            return parsed, json.dumps(
+                {"action": [action.model_dump(exclude_unset=True) for action in fallback_actions]},
+                ensure_ascii=False,
+            )
         logger.debug(f'LLM response: {response}')
-        record = str(response.content)
-
         output_dict = json.loads(record)
         normalized_actions = []
         for action in output_dict.get("action", []):
@@ -935,22 +1159,59 @@ class Agent:
                 if saved_name and saved_name not in self.infor_memory:
                     self.infor_memory.append(saved_name)
             normalized_actions.append(action)
+        normalized_actions = strip_premature_done_actions(normalized_actions)
+        normalized_actions = rewrite_google_images_navigation_actions(
+            normalized_actions,
+            task=self.task,
+            next_goal=self.next_goal,
+        )
         parsed: AgentOutput | None = AgentOutput(action=normalized_actions)
 
         self._log_response(parsed)
         return parsed, record
+
+    async def _ainvoke_json_text(
+        self,
+        llm: BaseChatModel,
+        input_messages: list[BaseMessage],
+        *,
+        label: str,
+        max_attempts: int = 2,
+    ) -> tuple[Any, str]:
+        last_error: Exception | None = None
+
+        for attempt in range(1, max_attempts + 1):
+            response = await llm.ainvoke(input_messages)
+            raw_text = str(response.content)
+            try:
+                return response, normalize_llm_json_text(raw_text)
+            except ValueError as exc:
+                last_error = exc
+                if "no assistant content" not in str(exc).lower() or attempt >= max_attempts:
+                    raise
+                logger.warning(
+                    "%s response contained only SSE metadata; retrying once (%s/%s).",
+                    label,
+                    attempt,
+                    max_attempts,
+                )
+
+        assert last_error is not None
+        raise last_error
     
 
     def _log_response(self, response: AgentOutput) -> None:
-        if 'Success' in self.current_state["step_evaluate"]:
+        current_state = getattr(self, "current_state", {}) or {}
+        step_evaluate = str(current_state.get("step_evaluate", "unknown"))
+        if 'Success' in step_evaluate:
             emoji = '✅'
-        elif 'Failed' in self.current_state["step_evaluate"]:
+        elif 'Failed' in step_evaluate:
             emoji = '❌'
         else:
             emoji = '🤷'
-        logger.info(f'{emoji} Eval: {self.current_state["step_evaluate"]}')
-        logger.info(f'🧠 Memory: {self.brain_memory}')
-        logger.info(f'🎯 Goal to achieve this step: {self.next_goal}')
+        logger.info(f'{emoji} Eval: {step_evaluate}')
+        logger.info(f'🧠 Memory: {getattr(self, "brain_memory", "")}')
+        logger.info(f'🎯 Goal to achieve this step: {getattr(self, "next_goal", "")}')
         for i, action in enumerate(response.action):
             logger.info(f'🛠️  Action {i + 1}/{len(response.action)}: {action.model_dump_json(exclude_unset=True)}')
     

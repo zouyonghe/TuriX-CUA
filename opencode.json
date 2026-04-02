@@ -4,7 +4,7 @@
     "turix": {
       "type": "local",
       "command": [
-        "python",
+        ".venv-mcp/bin/python",
         "mcp_server.py"
       ],
       "enabled": true
