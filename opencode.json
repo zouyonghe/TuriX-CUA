@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "turix": {
+      "type": "local",
+      "command": [
+        "/Users/buding/Git/TuriX-CUA/.venv-mcp/bin/python",
+        "/Users/buding/Git/TuriX-CUA/mcp_server.py"
+      ],
+      "enabled": true
+    }
+  }
+}
