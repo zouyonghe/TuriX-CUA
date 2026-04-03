@@ -33,7 +33,7 @@
 TuriX 让你的强大 AI 模型能在桌面上真正动手操作。
 它内置 **最先进的计算机使用Agent**（在我们的 OSWorld 风格 Mac 基准上成功率达到 80%，在 OSWorld 上成功率达到 60%），同时保持 100% 开源，并对个人与科研用途免费。
 
-想用你自己的模型？**先把 `config.example.json` 复制成 `config.json`，再修改即可。**
+想用你自己的模型？**先把 `examples/config.example.json` 复制成 `examples/config.json`，再修改即可。**
 
 ## 目录
 - [📞 联系方式与社区](#contact-community)
@@ -116,7 +116,7 @@ codex mcp add turix -- python /path/to/TuriX-CUA/mcp_server.py
 
 如果你的 TuriX 环境不是默认的 `python`，请把 `command` 改成对应解释器。
 
-这个 MCP server 刻意保持很薄：它只负责准备临时配置，然后用同一个 Python 解释器启动现有的 `main.py`。
+这个 MCP server 刻意保持很薄：它只负责准备临时配置，然后用同一个 Python 解释器启动现有的 `examples/main.py`。
 
 ---
 
@@ -148,7 +148,7 @@ git checkout mac_legacy
 
 **2025 年 9 月 30 日** - 🎉 激动人心的更新！我们在 [TuriX API 平台](https://turixapi.io) 发布了最新 AI 模型，带来更强性能、更聪明的推理以及更顺滑的集成，帮助你实现更强大的桌面自动化。开发者和研究者，现在就去平台获取并升级你的工作流！
 
-准备好体验了吗？更新你的 `config.json` 并开始自动化吧，祝你玩得开心！🎉
+准备好体验了吗？更新你的 `examples/config.json` 并开始自动化吧，祝你玩得开心！🎉
 
 *欢迎关注我们的 [Discord](https://discord.gg/vkEYj4EV2n) 获取使用技巧、用户故事以及后续的 重磅发布。*
 
@@ -190,7 +190,7 @@ git checkout mac_legacy
 |------------|---------------|
 | **SOTA 默认模型** | 在 Mac 上的成功率和速度上超越此前的开源Agent（如 UI‑TARS） |
 | **无需应用专用 API** | 只要人能点，TuriX 就能点——WhatsApp、Excel、Outlook、内部工具… |
-| **可热插拔的「大脑」** | 无需改代码即可替换 VLM 策略（`config.json`） |
+| **可热插拔的「大脑」** | 无需改代码即可替换 VLM 策略（`examples/config.json`） |
 | **MCP 就绪** | 可接入 *Claude for Desktop* 或 **任何** 支持 Model Context Protocol (MCP) 的Agent |
 | **Skills（Markdown 手册）** | Planner 仅根据名称/描述选择技能，Brain 使用完整技能内容来指导每一步 |
 
@@ -271,10 +271,10 @@ osascript -e 'tell application "Safari" to do JavaScript "alert("Triggering acce
 > [!IMPORTANT]
 > **任务配置非常关键**：任务指令的质量直接影响成功率。清晰、具体的提示会带来更好的自动化效果。
 
-先复制模板，再在 `config.json` 中编辑任务：
+先复制模板，再在 `examples/config.json` 中编辑任务：
 
 ```bash
-cp config.example.json config.json
+cp examples/config.example.json examples/config.json
 ```
 
 ```json
@@ -293,7 +293,7 @@ cp config.example.json config.json
 在这个 main（multi-agent）分支，你需要同时配置 brain、actor 和 memory 模型；目前该特性仅支持苹果电脑。如果开启规划（`agent.use_plan: true`），还需要配置 planner 模型。
 我们强烈建议你将 turix-actor 模型作为 actor。brain 可以使用你喜欢的任意 VLM，我们的API平台也提供Gemini-3-flash和turix-brain作为brain，适合大多数任务。
 
-在 `config.json` 中编辑 API：
+在 `examples/config.json` 中编辑 API：
 ```json
 "brain_llm": {
       "provider": "turix",
@@ -349,7 +349,7 @@ cp config.example.json config.json
 
 如果你想使用 build_llm 函数中未定义的其他模型，需要先在代码中定义，再在配置中设置。
 
-main.py:
+examples/main.py:
 
 ```
 if provider == "name_you_want":
@@ -376,7 +376,7 @@ description: 用于在浏览器中操作 GitHub（搜索仓库、点 Star 等）
 - 在继续之前确认 Star 按钮状态。
 ```
 
-在 `config.json` 中启用：
+在 `examples/config.json` 中启用：
 ```json
 {
   "agent": {
@@ -391,14 +391,14 @@ description: 用于在浏览器中操作 GitHub（搜索仓库、点 Star 等）
 #### 4.5 启动Agent
 
 ```bash
-python main.py
+python examples/main.py
 ```
 
 **享受免手操作的计算体验 🎉**
 
 #### 4.6 恢复已中断的任务
 
-如果任务中断，想从上次位置继续，请在 `config.json` 中设置固定的 `agent_id` 并开启 `resume`：
+如果任务中断，想从上次位置继续，请在 `examples/config.json` 中设置固定的 `agent_id` 并开启 `resume`：
 ```json
 {
     "agent": {

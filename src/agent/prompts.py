@@ -5,6 +5,8 @@ import os
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from src.agent.views import ActionResult, AgentStepInfo
+
+
 def _get_installed_app_names() -> list[str]:
     """
     Returns a list of application names (minus ".app")
@@ -19,9 +21,11 @@ def _get_installed_app_names() -> list[str]:
                     apps.add(item[:-4])
     return list(apps)
 
+
 apps = _get_installed_app_names()
-app_list = ', '.join(apps)
-apps_message = f'The available apps in this macbook is: {app_list}'
+app_list = ", ".join(apps)
+apps_message = f"The available apps in this macbook is: {app_list}"
+
 
 class SystemPrompt:
     def __init__(
@@ -36,6 +40,7 @@ class SystemPrompt:
     def get_system_message(self) -> SystemMessage:
         return SystemMessage(content="")
 
+
 class BrainPrompt_turix:
     def __init__(
         self,
@@ -48,7 +53,7 @@ class BrainPrompt_turix:
 
     def get_system_message(self) -> SystemMessage:
         return SystemMessage(
-content=f"""
+            content=f"""
 SYSTEM PROMPT FOR BRAIN MODEL:
 === GLOBAL INSTRUCTIONS ===
 - Environment: macOS. Current time is {self.current_time}.
@@ -98,12 +103,14 @@ OR (for read files only):
   13. If you find the information in the screenshot will help the later execution of the task, you need to write down in the next goal that you want the actor to record_info (with a short `file_name`), and what info to record.
 === ACTION-SPECIFIC REMINDERS ===
 - **Text Input:** Verify the insertion point is correct.
+- **Browser Address/Search Bar:** If the goal is to replace the browser's top address/search bar query and the visible query remains unchanged, mark the step as failed and explicitly instruct the actor to use Command+L before typing again.
 - **Scrolling:** Confirm that scrolling completed.
-- **Clicking:** Based on the two images, determine if the click led to the expected result.
+ - **Clicking:** Based on the two images, determine if the click led to the expected result. If a search-results click lands on Shopping, sponsored content, or the same results page, mark the step as failed and explicitly instruct the actor to re-locate the target result title and click the blue title text itself instead of the snippet or card body before retrying.
 ---
 *Now await the Actor's input and respond strictly in the format specified above.*
             """
         )
+
 
 class ActorPrompt_turix:
     def __init__(
@@ -137,9 +144,16 @@ WHEN OUTPUTTING MULTIPLE ACTIONS AS A LIST, EACH ACTION MUST BE AN OBJECT.
 {self.action_descriptions}
   2. If the next goal involves the intention to store information, you must output the action "record_info" with both `text` and `file_name`.
   3. When the next goal involves analyzing the user information, you must output a record_info action with a detailed analysis based on the screenshot, brain's analysis, and the stored information. The `file_name` should be a short summary ending in `.txt`.
+  4. When the goal explicitly targets the browser's top address/search bar or omnibox, prefer Command+L to focus it before typing instead of clicking the toolbar.
+  5. Do not click a result in the same step where you change the browser address/search bar query; stop after Enter/wait so the next step can inspect the refreshed results page.
+  6. For search result pages, click the center of the visible blue title text for the exact target result whenever possible; do not click the snippet or card body.
+  7. Avoid sponsored results, shopping blocks, AI overviews, page chrome, and snippets when the goal is to open a result page.
+  8. If the previous click failed and the page is still a results page, use minimal scrolling to re-locate the exact target result and retry with a single precise click.
+  9. If the goal says to open a search result and continue only after the destination page opens, stop after that first result click and at most one wait so the next step can inspect the newly loaded page.
             """
         )
-    
+
+
 class MemoryPrompt:
     def __init__(
         self,
@@ -149,6 +163,7 @@ class MemoryPrompt:
         self.action_descriptions = action_descriptions
         self.current_time = datetime.now()
         self.max_actions_per_step = max_actions_per_step
+
     def get_system_message(self) -> SystemMessage:
         return SystemMessage(
             content=f"""
@@ -167,6 +182,7 @@ while retaining all critical information that may be useful for future reference
             """
         )
 
+
 class AgentMessagePrompt:
     def __init__(
         self,
@@ -181,8 +197,16 @@ class AgentMessagePrompt:
         Changed state_content type to list for proper unpacking
         """
         # Collect all text items in order and keep all images
-        text_items = [item.get('content', '') for item in state_content if item.get('type') == 'text']
-        image_items = [item['image_url']['url'] for item in state_content if item.get('type') == 'image_url']
+        text_items = [
+            item.get("content", "")
+            for item in state_content
+            if item.get("type") == "text"
+        ]
+        image_items = [
+            item["image_url"]["url"]
+            for item in state_content
+            if item.get("type") == "image_url"
+        ]
 
         self.state = "\n\n".join([t for t in text_items if t])
         self.image_urls = image_items  # Now storing all image URLs in a list
@@ -193,34 +217,36 @@ class AgentMessagePrompt:
 
     def get_user_message(self) -> HumanMessage:
         """Keep text and images separated but in a single message"""
-        step_info_str = f"Step {self.step_info.step_number + 1}/{self.step_info.max_steps}\n" if self.step_info else ""
-        
+        step_info_str = (
+            f"Step {self.step_info.step_number + 1}/{self.step_info.max_steps}\n"
+            if self.step_info
+            else ""
+        )
+
         # Create structured content list
         content = [
             {
                 "type": "text",
-                "text": f"{step_info_str}CURRENT APPLICATION STATE:\n{self.state}"
+                "text": f"{step_info_str}CURRENT APPLICATION STATE:\n{self.state}",
             }
         ]
-        
+
         # Add all images to the content list
         for image_url in self.image_urls:
-            content.append({
-                "type": "image_url",
-                "image_url": {"url": image_url}
-            })
+            content.append({"type": "image_url", "image_url": {"url": image_url}})
 
         # Add action results as text
         # since we introduce the result into brain in state_content, here is not required
         # if self.result:
         #     results_text = "\n".join(
-        #         f"ACTION RESULT {i+1}: {r.extracted_content}" if r.extracted_content 
-        #         else f"ACTION ERROR {i+1}: ...{r.error[-self.max_error_length:]}" 
+        #         f"ACTION RESULT {i+1}: {r.extracted_content}" if r.extracted_content
+        #         else f"ACTION ERROR {i+1}: ...{r.error[-self.max_error_length:]}"
         #         for i, r in enumerate(self.result)
         #     )
         #     content.append({"type": "text", "text": results_text})
 
         return HumanMessage(content=content)
+
 
 class PlannerPrompt:
     def __init__(
@@ -234,6 +260,7 @@ class PlannerPrompt:
         # self.current_date = current_date
         self.max_actions_per_step = max_actions_per_step
         self.skill_catalog = skill_catalog
+
     def get_system_message(self) -> SystemMessage:
         skills_block = ""
         if self.skill_catalog:
@@ -249,7 +276,7 @@ Use the descriptions to decide which skills help the task.
 (No skills provided.)
 """
         return SystemMessage(
-content = f"""
+            content=f"""
 SYSTEM_PROMPT_FOR_PLANNER
 =========================
 === GLOBAL INSTRUCTIONS ===
@@ -300,7 +327,7 @@ SYSTEM_PROMPT_FOR_PLANNER
   2. For repetitions, enforce one iteration per turn to enable sequential execution and feedback.
   3. If the previous tasks were completed successfully, the new plan should not involve redoing previous completed plans.
 === SPECIFIC PLANNING GUIDELINES ===
-- Prioritize AppleScript/terminal for speed in repetitive actions if suitable.
+- Prefer graphical navigation for browser/UI tasks; do not bypass result pages with direct URL scripting or terminal shortcuts unless the user explicitly requests that behavior.
 === IMPORTANT REMINDERS ===
 - Specify apps in descriptions (e.g., "In Safari, download the specific image").
 - No "verify/check" in descriptions.
@@ -309,12 +336,13 @@ SYSTEM_PROMPT_FOR_PLANNER
 ---
 *Respond strictly with the JSON output.*
 """
-
-  )
+        )
 
 
 class PlannerPreplanPrompt:
-    def __init__(self, task: str, use_search: bool, use_skills: bool, skill_catalog: str = ""):
+    def __init__(
+        self, task: str, use_search: bool, use_skills: bool, skill_catalog: str = ""
+    ):
         self.task = task
         self.use_search = use_search
         self.use_skills = use_skills
@@ -329,7 +357,7 @@ class PlannerPreplanPrompt:
         return (
             "You are a planner pre-processor. Decide whether web search is needed and which skills apply. "
             "Return JSON only in the following format:\n"
-            "{\"use_search\": false, \"queries\": [], \"selected_skills\": []}\n"
+            '{"use_search": false, "queries": [], "selected_skills": []}\n'
             "Rules:\n"
             f"- Search enabled: {self.use_search}. If disabled, set use_search=false and queries=[].\n"
             "- If search is needed, use_search=true and provide 1-3 queries.\n"
@@ -345,7 +373,12 @@ class PlannerPreplanPrompt:
 
 
 class PlannerPlanMessageBuilder:
-    def __init__(self, action_descriptions: str, skill_catalog: str = "", use_skills: bool = False):
+    def __init__(
+        self,
+        action_descriptions: str,
+        skill_catalog: str = "",
+        use_skills: bool = False,
+    ):
         self.action_descriptions = action_descriptions
         self.skill_catalog = skill_catalog
         self.use_skills = use_skills
@@ -358,7 +391,7 @@ class PlannerPlanMessageBuilder:
             f"{search_context}\n\n"
         )
         search_guidance = (
-            "Use the search findings above to populate the \"important search info\" field in every step "
+            'Use the search findings above to populate the "important search info" field in every step '
             "with concise, useful insights that support that step. "
             "Include a short summary of the most relevant search findings for the overall task if helpful.\n"
         )
@@ -373,9 +406,7 @@ class PlannerPlanMessageBuilder:
             return "", ""
         if selected_skills:
             skills_list = ", ".join(selected_skills)
-            skill_block = (
-                f"Preselected skills (use EXACTLY these in selected_skills): {skills_list}\n\n"
-            )
+            skill_block = f"Preselected skills (use EXACTLY these in selected_skills): {skills_list}\n\n"
             if skill_context:
                 skill_block += f"Selected skill instructions:\n{skill_context}\n\n"
             skill_guidance = "Use the selected skill instructions above to guide the plan for each step.\n"

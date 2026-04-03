@@ -4,11 +4,10 @@ from pathlib import Path
 from pynput import keyboard
 
 # Add the project root to Python path
-project_root = Path(__file__).parent
+project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
-DEFAULT_CONFIG_NAME = "config.json"
-LEGACY_CONFIG_NAMES = ("config", "config.example.json", "config.example")
+DEFAULT_CONFIG_NAME = "examples/config.json"
 
 from config_env import resolve_env_placeholders
 from langchain_openai import ChatOpenAI
@@ -21,6 +20,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from src import Agent
 from src.controller.service import Controller
 from job_status import build_progress_update, update_status
+from mcp_bridge import run_task_bridge
 
 
 class CompatChatOpenAI(ChatOpenAI):
@@ -148,13 +148,39 @@ def resolve_config_path(config_path: str | Path) -> Path:
     if path.is_absolute():
         return path
 
-    if str(path) == DEFAULT_CONFIG_NAME:
-        for candidate_name in (DEFAULT_CONFIG_NAME, *LEGACY_CONFIG_NAMES):
-            candidate = project_root / candidate_name
-            if candidate.exists():
-                return candidate
-
     return project_root / path
+
+
+def should_queue_mcp_runtime(config_path: Path, cfg: dict) -> bool:
+    if cfg.get("job_status_path"):
+        return False
+
+    mcp_runtime_dir = (project_root / ".turix_tmp" / "mcp").resolve()
+    try:
+        relative_path = config_path.resolve().relative_to(mcp_runtime_dir)
+    except ValueError:
+        return False
+
+    return (
+        relative_path.parent == Path(".")
+        and relative_path.suffix == ".json"
+        and relative_path.name.startswith("turix-mcp-")
+    )
+
+
+def queue_mcp_runtime(config_path: Path, cfg: dict) -> dict[str, object]:
+    agent_cfg = cfg.get("agent", {})
+    return run_task_bridge(
+        task=agent_cfg.get("task"),
+        config_path=config_path,
+        use_plan=agent_cfg.get("use_plan"),
+        use_skills=agent_cfg.get("use_skills"),
+        resume=agent_cfg.get("resume", False),
+        agent_id=agent_cfg.get("agent_id"),
+        max_steps=agent_cfg.get("max_steps"),
+        dry_run=False,
+        timeout_sec=None,
+    )
 
 
 def load_config(path: Path) -> dict:
@@ -394,6 +420,12 @@ def build_llm(cfg: dict, *, enable_thinking: bool | None = None):
 def main(config_path: str = DEFAULT_CONFIG_NAME):
     config_path = resolve_config_path(config_path)
     cfg = load_config(config_path)
+    if should_queue_mcp_runtime(config_path, cfg):
+        result = queue_mcp_runtime(config_path, cfg)
+        json.dump(result, sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return result
+
     output_dir = resolve_output_dir(cfg, config_path)
     job_status_path = resolve_job_status_path(cfg.get("job_status_path"), config_path)
     brain_enable_thinking = cfg.get("brain_enable_thinking")

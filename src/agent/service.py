@@ -9,16 +9,15 @@ from pathlib import Path
 import Quartz
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 import re
-from urllib.parse import quote
 from datetime import datetime
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
 from typing import Type
 from collections import OrderedDict
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_openai import ChatOpenAI, AzureChatOpenAI          # OpenAI endpoints
-from langchain_anthropic import ChatAnthropic                     # Claude
-from langchain_google_genai import ChatGoogleGenerativeAI  
+from langchain_openai import ChatOpenAI, AzureChatOpenAI  # OpenAI endpoints
+from langchain_anthropic import ChatAnthropic  # Claude
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_core.messages import (
     BaseMessage,
@@ -42,7 +41,7 @@ from src.agent.views import (
     AgentHistoryList,
     AgentOutput,
     AgentStepInfo,
-    AgentBrain
+    AgentBrain,
 )
 from src.controller.registry.views import ActionModel
 from src.utils.record_store import RecordStore
@@ -64,9 +63,10 @@ from src.agent.structured_llm import *
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 TASK_ID_MAX_LEN = 60
+
 
 def _task_to_slug(task: str, max_len: int = TASK_ID_MAX_LEN) -> str:
     task = task.strip().lower()
@@ -76,12 +76,14 @@ def _task_to_slug(task: str, max_len: int = TASK_ID_MAX_LEN) -> str:
         task = "task"
     return task[:max_len]
 
+
 def _default_agent_id(task: str, now: datetime) -> str:
     date_str = now.strftime("%Y-%m-%d")
     slug = _task_to_slug(task)
     return f"{date_str}_{slug}"
 
-def screenshot_to_dataurl(screenshot, *, max_width: int = 1024, jpeg_quality: int = 60):
+
+def screenshot_to_dataurl(screenshot, *, max_width: int = 1728, jpeg_quality: int = 85):
     image = screenshot.copy()
     if image.width > max_width:
         ratio = max_width / image.width
@@ -100,6 +102,16 @@ def screenshot_to_dataurl(screenshot, *, max_width: int = 1024, jpeg_quality: in
     return f"data:image/jpeg;base64,{base64_encoded}"
 
 
+def build_image_content_block(screenshot, *, detail: str = "high") -> dict[str, Any]:
+    return {
+        "type": "image_url",
+        "image_url": {
+            "url": screenshot_to_dataurl(screenshot),
+            "detail": detail,
+        },
+    }
+
+
 def strip_premature_done_actions(actions: list[Any]) -> list[Any]:
     if len(actions) <= 1:
         return actions
@@ -107,7 +119,11 @@ def strip_premature_done_actions(actions: list[Any]) -> list[Any]:
     filtered_actions = []
     removed_done = False
     for action in actions:
-        payload = action.model_dump(exclude_unset=True) if hasattr(action, "model_dump") else action
+        payload = (
+            action.model_dump(exclude_unset=True)
+            if hasattr(action, "model_dump")
+            else action
+        )
         if list(payload.keys()) == ["done"]:
             removed_done = True
             continue
@@ -121,159 +137,353 @@ def strip_premature_done_actions(actions: list[Any]) -> list[Any]:
     return filtered_actions or actions
 
 
-def _extract_google_images_query(task: str, next_goal: str) -> Optional[str]:
-    combined = f"{task}\n{next_goal}"
-
-    quoted_patterns = [
-        r'search for ["“”\'「『]([^"“”\'」』]+)["“”\'」』]\s+images?',
-        r"results page for\s+['\"“”「『]?([^\"“”'」』\n,.]+)['\"“”」』]?",
-        r"page for\s+['\"“”「『]?([^\"“”'」』\n,.]+)['\"“”」』]?",
-        r"for\s+['\"“”「『]?([^\"“”'」』\n,.]+)['\"“”」』]?\s+images",
-    ]
-    for pattern in quoted_patterns:
-        match = re.search(pattern, combined, flags=re.IGNORECASE)
-        if match:
-            return match.group(1).strip()
-
-    google_query_patterns = [
-        r"google search results page for\s+([^\n,.]+)",
-        r"google images results for\s+([^\n,.]+)",
-        r"current query\s+(?!to\b|and\b|in\b|on\b)([^\n,.]+?)(?:\s+(?:and|to|in|on)\b|[.,\n]|$)",
-    ]
-    for pattern in google_query_patterns:
-        match = re.search(pattern, combined, flags=re.IGNORECASE)
-        if match:
-            return match.group(1).strip(" '\"“”「」『』")
-
-    return None
-
-
-def _detect_browser_app(task: str, next_goal: str) -> str:
-    combined = f"{task}\n{next_goal}".lower()
-    if "google chrome" in combined or re.search(r"\bchrome\b", combined):
-        return "Google Chrome"
-    if "safari" in combined:
-        return "Safari"
-    return "Safari"
-
-
-def _is_google_images_navigation_request(task: str, next_goal: str) -> bool:
-    task_text = task.lower()
-    task_markers = (
-        "google images",
-        "tbm=isch",
-        "image thumbnails",
-        "image results",
-        "images results",
-        "search for",
-        "图片",
-        "画像",
-    )
-    if any(marker in task_text for marker in task_markers):
-        if "search for" in task_text and "images" not in task_text and "google images" not in task_text:
-            return False
-        return True
-    return False
-
-
-def _build_google_images_applescript(query: Optional[str], browser_app: str) -> str:
-    if query:
-        encoded_query = quote(query, safe="")
-        if browser_app == "Google Chrome":
-            return (
-                'tell application "Google Chrome"\n'
-                "    activate\n"
-                "    delay 0.2\n"
-                "    if (count of windows) = 0 then make new window\n"
-                f'    set URL of active tab of front window to "https://www.google.com/search?tbm=isch&q={encoded_query}"\n'
-                "end tell"
-            )
-        return (
-            'tell application "Safari"\n'
-            "    activate\n"
-            "    delay 0.2\n"
-            "    if (count of documents) = 0 then make new document\n"
-            f'    set URL of front document to "https://www.google.com/search?tbm=isch&q={encoded_query}"\n'
-            "end tell"
-        )
-
-    if browser_app == "Google Chrome":
-        return (
-            'tell application "Google Chrome"\n'
-            "    activate\n"
-            "    delay 0.2\n"
-            "    if (count of windows) = 0 then error \"No Google Chrome window available to derive the current Google query.\"\n"
-            "    execute active tab of front window javascript \"(() => { const fromInput = document.querySelector('input[name=\\\"q\\\"]')?.value || ''; "
-            "let fromUrl = ''; try { fromUrl = new URL(window.location.href).searchParams.get('q') || ''; } catch (e) {} "
-            "const q = fromInput || fromUrl; if (!q) { throw new Error('No query available'); } "
-            "window.location.href = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(q); return q; })();\"\n"
-            "end tell"
-        )
-
-    return (
-        'tell application "Safari"\n'
-        "    activate\n"
-        "    delay 0.2\n"
-        "    if (count of documents) = 0 then error \"No Safari document available to derive the current Google query.\"\n"
-        "    do JavaScript \"(() => { const fromInput = document.querySelector('input[name=\\\"q\\\"]')?.value || ''; "
-        "let fromUrl = ''; try { fromUrl = new URL(window.location.href).searchParams.get('q') || ''; } catch (e) {} "
-        "const q = fromInput || fromUrl; if (!q) { throw new Error('No query available'); } "
-        "window.location.href = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(q); return q; })();\" in front document\n"
-        "end tell"
-    )
-
-
-def build_google_images_fallback_actions(
-    *,
-    task: str,
-    next_goal: str,
-) -> Optional[list[ActionModel]]:
-    if not _is_google_images_navigation_request(task, next_goal):
-        return None
-    if next_goal.strip().lower().startswith("stop"):
-        return [ActionModel.model_validate({"done": {}})]
-
-    query = _extract_google_images_query(task, next_goal)
-    browser_app = _detect_browser_app(task, next_goal)
-    script = _build_google_images_applescript(query, browser_app)
-    logger.warning(
-        "Using deterministic Google Images fallback in %s%s.",
-        browser_app,
-        f" for query '{query}'" if query else " using the current page query",
-    )
-    return [
-        ActionModel.model_validate({"run_apple_script": {"script": script}}),
-        ActionModel.model_validate({"wait": {}}),
-    ]
-
-
 def rewrite_google_images_navigation_actions(
     actions: list[Any],
     *,
     task: str,
     next_goal: str,
 ) -> list[Any]:
-    if not actions or not _is_google_images_navigation_request(task, next_goal):
+    # Compatibility shim kept for existing call sites and tests.
+    # Browser navigation must remain graphical, so no action rewriting happens here.
+    _ = (task, next_goal)
+    return actions
+
+
+def _action_payload(action: Any) -> dict[str, Any]:
+    if hasattr(action, "model_dump"):
+        return action.model_dump(exclude_unset=True)
+    return action if isinstance(action, dict) else {}
+
+
+def _action_name(action: Any) -> str:
+    payload = _action_payload(action)
+    if not payload:
+        return ""
+    return next(iter(payload.keys()))
+
+
+def _normalize_hotkey_key(key: Any) -> str:
+    normalized = str(key or "").strip().upper()
+    if normalized in {"CMD", "COMMAND", "⌘"}:
+        return "CMD"
+    if normalized in {"ESC", "ESCAPE"}:
+        return "ESC"
+    return normalized
+
+
+def _multi_hotkey_matches(action: Any, key1: str, key2: str) -> bool:
+    payload = _action_payload(action)
+    if _action_name(action) != "multi_Hotkey":
+        return False
+    params = payload.get("multi_Hotkey") or {}
+    return _normalize_hotkey_key(params.get("key1", "")) == _normalize_hotkey_key(
+        key1
+    ) and _normalize_hotkey_key(params.get("key2", "")) == _normalize_hotkey_key(key2)
+
+
+def _is_enter_hotkey(action: Any) -> bool:
+    payload = _action_payload(action)
+    if _action_name(action) != "Hotkey":
+        return False
+    params = payload.get("Hotkey") or {}
+    return _normalize_hotkey_key(params.get("key", "")) == "ENTER"
+
+
+def _is_escape_hotkey(action: Any) -> bool:
+    payload = _action_payload(action)
+    if _action_name(action) != "Hotkey":
+        return False
+    params = payload.get("Hotkey") or {}
+    return _normalize_hotkey_key(params.get("key", "")) == "ESC"
+
+
+def _input_text_trailing_submit_text(action: Any) -> str | None:
+    payload = _action_payload(action)
+    if _action_name(action) != "input_text":
+        return None
+    params = payload.get("input_text") or {}
+    text = str(params.get("text", ""))
+    stripped = text.rstrip("\r\n")
+    if stripped == text:
+        return None
+    return stripped
+
+
+def _browser_address_bar_popup_recovery_goal(task: str, next_goal: str) -> bool:
+    combined = f"{task}\n{next_goal}".lower()
+    recovery_tokens = (
+        "page find box",
+        "find box",
+        "site search",
+        "tab search",
+        "search popup",
+        "floating search popup",
+        "small top-right search popup",
+        "wrong field",
+        "do not use the page find box",
+    )
+    return any(token in combined for token in recovery_tokens)
+
+
+def _browser_address_bar_preserve_click_goal(task: str, next_goal: str) -> bool:
+    combined = f"{task}\n{next_goal}".lower()
+    activation_tokens = (
+        "make it active",
+        "activate it",
+        "activate the",
+        "click the right",
+        "click the left",
+        "click the browser window",
+        "click the chrome window",
+        "click the safari window",
+        "webpage body",
+    )
+    cursor_recovery = (
+        "click once inside" in combined or "click directly inside" in combined
+    ) and (
+        "place the text cursor" in combined
+        or "url is shown" in combined
+        or "where the github url is shown" in combined
+    )
+    return any(token in combined for token in activation_tokens) or cursor_recovery
+
+
+def _browser_address_bar_goal(task: str, next_goal: str) -> bool:
+    combined = f"{task}\n{next_goal}".lower()
+    browser_tokens = (
+        "safari",
+        "chrome",
+        "firefox",
+        "edge",
+        "arc",
+        "brave",
+        "browser",
+        "google results",
+        "google search",
+        "web search",
+    )
+    toolbar_tokens = (
+        "address/search bar",
+        "address bar",
+        "combined address/search bar",
+        "combined search/address bar",
+        "omnibox",
+        "url bar",
+    )
+    query_tokens = (
+        "type exactly",
+        "press enter",
+        "run the search",
+        "search results",
+        "query",
+    )
+    return (
+        any(token in combined for token in browser_tokens)
+        and any(token in combined for token in toolbar_tokens)
+        and any(token in combined for token in query_tokens)
+    )
+
+
+def rewrite_browser_address_bar_actions(
+    actions: list[Any],
+    *,
+    task: str,
+    next_goal: str,
+) -> list[Any]:
+    if not actions or not _browser_address_bar_goal(task, next_goal):
         return actions
 
-    action_payloads = [
-        action.model_dump(exclude_unset=True) if hasattr(action, "model_dump") else action
-        for action in actions
-    ]
-    action_names = [next(iter(payload.keys()), "") for payload in action_payloads if isinstance(payload, dict)]
-    if action_names == ["done"]:
-        if next_goal.strip():
-            return actions
-        fallback_actions = build_google_images_fallback_actions(task=task, next_goal=task)
-        return fallback_actions or actions
-    if "run_apple_script" in action_names:
+    first_input_index: int | None = None
+    for index, action in enumerate(actions):
+        payload = _action_payload(action)
+        if _action_name(action) != "input_text":
+            continue
+        params = payload.get("input_text") or {}
+        if str(params.get("text", "")).strip():
+            first_input_index = index
+            break
+
+    if first_input_index is None:
         return actions
 
-    fallback_actions = build_google_images_fallback_actions(task=task, next_goal=next_goal)
-    if fallback_actions is None:
+    implicit_submit_text = _input_text_trailing_submit_text(actions[first_input_index])
+    if not any(
+        _is_enter_hotkey(action) for action in actions[first_input_index + 1 :]
+    ) and (implicit_submit_text is None):
         return actions
-    logger.warning("Rewriting Google Images navigation step to deterministic Safari AppleScript.")
-    return fallback_actions
+
+    needs_popup_recovery = _browser_address_bar_popup_recovery_goal(task, next_goal)
+    preserve_pre_input_clicks = _browser_address_bar_preserve_click_goal(
+        task, next_goal
+    )
+
+    rewritten: list[Any] = []
+    inserted_focus = False
+    enter_seen = False
+    preserved_escape = False
+    for index, action in enumerate(actions):
+        if index < first_input_index and (
+            (_action_name(action) == "Click" and not preserve_pre_input_clicks)
+            or _multi_hotkey_matches(action, "CMD", "A")
+            or _multi_hotkey_matches(action, "CMD", "L")
+        ):
+            continue
+
+        if index < first_input_index and _is_escape_hotkey(action):
+            preserved_escape = True
+
+        if index == first_input_index and not inserted_focus:
+            if needs_popup_recovery and not preserved_escape:
+                rewritten.append(ActionModel.model_validate({"Hotkey": {"key": "ESC"}}))
+            rewritten.append(
+                ActionModel.model_validate(
+                    {"multi_Hotkey": {"key1": "CMD", "key2": "L", "key3": None}}
+                )
+            )
+            rewritten.append(
+                ActionModel.model_validate(
+                    {"multi_Hotkey": {"key1": "CMD", "key2": "A", "key3": None}}
+                )
+            )
+            inserted_focus = True
+
+        if enter_seen and _action_name(action) != "wait":
+            continue
+
+        if index == first_input_index and implicit_submit_text is not None:
+            rewritten.append(
+                ActionModel.model_validate(
+                    {"input_text": {"text": implicit_submit_text}}
+                )
+            )
+            rewritten.append(ActionModel.model_validate({"Hotkey": {"key": "ENTER"}}))
+            enter_seen = True
+            continue
+
+        rewritten.append(action)
+        if _is_enter_hotkey(action):
+            enter_seen = True
+
+    if inserted_focus or rewritten != actions:
+        logger.info(
+            "Rewriting browser address-bar query step to Command+L focus before typing."
+        )
+        return rewritten
+
+    return actions
+
+
+def _search_result_navigation_goal(task: str, next_goal: str) -> bool:
+    combined = f"{task}\n{next_goal}".lower()
+    browser_tokens = (
+        "safari",
+        "chrome",
+        "firefox",
+        "edge",
+        "arc",
+        "brave",
+        "browser",
+    )
+    result_target_tokens = (
+        "top result",
+        "first result",
+        "visible result",
+        "blue result title",
+        "result titled",
+        "result with the title",
+        "exact result",
+        "exact target result",
+        "credible result",
+        "preferred result",
+        "credible rating/list result",
+    )
+    follow_up_tokens = (
+        "after the page opens",
+        "after that page opens",
+        "after the douban page opens",
+        "after opening it",
+        "page opens",
+        "click it to open",
+        "open the page",
+        "open it",
+        "wait for the",
+        "do not click non-",
+        "stop only when",
+        "if needed",
+        "look for one specific",
+        "look for a specific",
+        "find one specific",
+        "find a specific",
+        "then click",
+        "destination page",
+        "dedicated rating page",
+        "dedicated rating/detail page",
+        "dedicated page",
+        "detail page",
+    )
+    return (
+        any(token in combined for token in browser_tokens)
+        and any(token in combined for token in result_target_tokens)
+        and any(token in combined for token in follow_up_tokens)
+    )
+
+
+def _current_results_page_goal(task: str, next_goal: str) -> bool:
+    combined = f"{task}\n{next_goal}".lower()
+    current_page_tokens = (
+        "current google results page",
+        "current search results page",
+        "current results page",
+        "on the current",
+    )
+    return any(token in combined for token in current_page_tokens)
+
+
+def rewrite_search_result_navigation_actions(
+    actions: list[Any],
+    *,
+    task: str,
+    next_goal: str,
+) -> list[Any]:
+    if not actions or not _search_result_navigation_goal(task, next_goal):
+        return actions
+
+    first_click_index: int | None = None
+    for index, action in enumerate(actions):
+        if _action_name(action) == "Click":
+            first_click_index = index
+            break
+
+    if first_click_index is None:
+        return actions
+
+    trailing_actions = actions[first_click_index + 1 :]
+    if not any(_action_name(action) != "wait" for action in trailing_actions):
+        return actions
+
+    rewritten_prefix = list(actions[:first_click_index])
+    if _current_results_page_goal(task, next_goal):
+        rewritten_prefix = [
+            action
+            for action in rewritten_prefix
+            if _action_name(action) not in {"open_app", "wait"}
+        ]
+
+    rewritten = rewritten_prefix + [actions[first_click_index]]
+    first_wait = next(
+        (action for action in trailing_actions if _action_name(action) == "wait"),
+        None,
+    )
+    if first_wait is not None:
+        rewritten.append(first_wait)
+    else:
+        rewritten.append(ActionModel.model_validate({"wait": {}}))
+
+    logger.info(
+        "Rewriting search-result navigation step to stop after the first result click."
+    )
+    return rewritten
+
 
 def _llm_identity_text(llm: Optional[BaseChatModel]) -> str:
     if llm is None:
@@ -314,7 +524,9 @@ def llm_supports_response_format(llm: Optional[BaseChatModel]) -> bool:
     return True
 
 
-def to_structured(llm: Optional[BaseChatModel], Schema, Structured_Output) -> Optional[BaseChatModel]:
+def to_structured(
+    llm: Optional[BaseChatModel], Schema, Structured_Output
+) -> Optional[BaseChatModel]:
     """
     Wrap *any* LangChain chat model with the right structured-output mechanism:
 
@@ -341,7 +553,9 @@ def to_structured(llm: Optional[BaseChatModel], Schema, Structured_Output) -> Op
         # (type/name/schema/strict), while many OpenAI-compatible backends accept the nested
         # {"type":"json_schema","json_schema":{...}} shape.
         response_format = Schema
-        base_url = str(getattr(llm, "openai_api_base", "") or getattr(llm, "base_url", "") or "").lower()
+        base_url = str(
+            getattr(llm, "openai_api_base", "") or getattr(llm, "base_url", "") or ""
+        ).lower()
         is_openai_cloud = (not base_url) or ("api.openai.com" in base_url)
         if is_openai_cloud and isinstance(Schema, dict):
             schema_type = Schema.get("type")
@@ -379,6 +593,7 @@ def to_structured(llm: Optional[BaseChatModel], Schema, Structured_Output) -> Op
     # Fallback: no structured output
     return llm
 
+
 class Agent:
     def __init__(
         self,
@@ -387,7 +602,7 @@ class Agent:
         actor_llm: BaseChatModel,
         memory_llm: BaseChatModel,
         controller: Controller = Controller(),
-        use_ui = False,
+        use_ui=False,
         use_search: bool = True,
         use_skills: bool = False,
         skills_dir: Optional[str] = None,
@@ -396,64 +611,88 @@ class Agent:
         save_planner_conversation_path: Optional[str] = None,
         save_planner_conversation_path_encoding: Optional[str] = "utf-8",
         save_brain_conversation_path: Optional[str] = None,
-        save_brain_conversation_path_encoding: Optional[str] = 'utf-8',
+        save_brain_conversation_path_encoding: Optional[str] = "utf-8",
         save_actor_conversation_path: Optional[str] = None,
-        save_actor_conversation_path_encoding: Optional[str] = 'utf-8',
+        save_actor_conversation_path_encoding: Optional[str] = "utf-8",
         artifacts_dir: Optional[str] = None,
         max_failures: int = 5,
         memory_budget: int = 500,
         summary_memory_budget: Optional[int] = None,
         retry_delay: int = 10,
         max_input_tokens: int = 32000,
-        resume = False,
+        resume=False,
         include_attributes: list[str] = [
-            'title',
-            'type',
-            'name',
-            'role',
-            'tabindex',
-            'aria-label',
-            'placeholder',
-            'value',
-            'alt',
-            'aria-expanded',
+            "title",
+            "type",
+            "name",
+            "role",
+            "tabindex",
+            "aria-label",
+            "placeholder",
+            "value",
+            "alt",
+            "aria-expanded",
         ],
         max_error_length: int = 400,
         max_actions_per_step: int = 10,
-
-        register_new_step_callback: Callable[['str', 'AgentOutput', int], None] | None = None,
-        register_done_callback: Callable[['AgentHistoryList'], None] | None = None,
-        tool_calling_method: Optional[str] = 'auto',
+        register_new_step_callback: Callable[["str", "AgentOutput", int], None]
+        | None = None,
+        register_done_callback: Callable[["AgentHistoryList"], None] | None = None,
+        tool_calling_method: Optional[str] = "auto",
         agent_id: Optional[str] = None,
     ):
         self.wait_this_step = False
         self.current_time = datetime.now()
         self.agent_id = agent_id or _default_agent_id(task, self.current_time)
         self.task = task
-        self.artifacts_dir = Path(artifacts_dir).expanduser().resolve() if artifacts_dir else None
+        self.artifacts_dir = (
+            Path(artifacts_dir).expanduser().resolve() if artifacts_dir else None
+        )
         if self.artifacts_dir:
             self.images_dir = str(self.artifacts_dir / "images" / self.agent_id)
             self.save_temp_file_path = str(self.artifacts_dir / "temp_files")
         else:
             self.images_dir = "images"
-            self.save_temp_file_path = os.path.join(os.path.dirname(__file__), "temp_files")
-        self.memory_budget = memory_budget  # Max recent-memory characters before summarization
-        self.summary_memory_budget = summary_memory_budget if summary_memory_budget is not None else max(1, memory_budget * 4)
+            self.save_temp_file_path = os.path.join(
+                os.path.dirname(__file__), "temp_files"
+            )
+        self.memory_budget = (
+            memory_budget  # Max recent-memory characters before summarization
+        )
+        self.summary_memory_budget = (
+            summary_memory_budget
+            if summary_memory_budget is not None
+            else max(1, memory_budget * 4)
+        )
         self.original_task = task
         self.resume = resume
-        self.memory_llm = to_structured(memory_llm, OutputSchemas.MEMORY_RESPONSE_FORMAT, MemoryOutput)
-        self.brain_llm = to_structured(brain_llm, OutputSchemas.BRAIN_RESPONSE_FORMAT, BrainOutput)
-        self.actor_llm = to_structured(actor_llm, OutputSchemas.ACTION_RESPONSE_FORMAT, ActorOutput)
+        self.memory_llm = to_structured(
+            memory_llm, OutputSchemas.MEMORY_RESPONSE_FORMAT, MemoryOutput
+        )
+        self.brain_llm = to_structured(
+            brain_llm, OutputSchemas.BRAIN_RESPONSE_FORMAT, BrainOutput
+        )
+        self.actor_llm = to_structured(
+            actor_llm, OutputSchemas.ACTION_RESPONSE_FORMAT, ActorOutput
+        )
         self.planner_llm_raw = planner_llm
-        self.planner_llm = to_structured(planner_llm, OutputSchemas.PLANNER_RESPONSE_FORMAT, PlannerOutput)
+        self.planner_llm = to_structured(
+            planner_llm, OutputSchemas.PLANNER_RESPONSE_FORMAT, PlannerOutput
+        )
 
         self.save_actor_conversation_path = save_actor_conversation_path
-        self.save_actor_conversation_path_encoding = save_actor_conversation_path_encoding
+        self.save_actor_conversation_path_encoding = (
+            save_actor_conversation_path_encoding
+        )
 
         self.save_brain_conversation_path = save_brain_conversation_path
-        self.save_brain_conversation_path_encoding = save_brain_conversation_path_encoding
+        self.save_brain_conversation_path_encoding = (
+            save_brain_conversation_path_encoding
+        )
         self.save_planner_conversation_path = save_planner_conversation_path
-        self.save_planner_conversation_path_encoding = save_planner_conversation_path_encoding or "utf-8"
+        self.save_planner_conversation_path_encoding = (
+            save_planner_conversation_path_encoding or "utf-8"
+        )
 
         self.include_attributes = include_attributes
         self.max_error_length = max_error_length
@@ -467,8 +706,8 @@ class Agent:
         self.available_skills = []
         self.selected_skills = []
         self.skill_context = ""
-        self.next_goal = ''
-        self.brain_thought = ''
+        self.next_goal = ""
+        self.brain_thought = ""
 
         self.mac_tree_builder = MacUITreeBuilder()
         self.controller = controller
@@ -485,20 +724,24 @@ class Agent:
 
         if self.resume and not agent_id:
             raise ValueError("Agent ID is required for resuming a task.")
-        self.save_temp_file_path = os.path.join(self.save_temp_file_path, f"{self.agent_id}")
+        self.save_temp_file_path = os.path.join(
+            self.save_temp_file_path, f"{self.agent_id}"
+        )
         self.record_dir = os.path.join(self.save_temp_file_path, "records")
         self.record_store = RecordStore(
             self.record_dir,
             encoding=self.save_brain_conversation_path_encoding or "utf-8",
         )
-        self.memory_snapshot_dir = os.path.join(self.save_temp_file_path, "memory_snapshots")
+        self.memory_snapshot_dir = os.path.join(
+            self.save_temp_file_path, "memory_snapshots"
+        )
         self.memory_snapshot_store = RecordStore(
             self.memory_snapshot_dir,
             encoding=self.save_brain_conversation_path_encoding or "utf-8",
         )
         self.brain_search = BrainSearchFlow(self.record_store)
-        logger.info(f'Agent ID: {self.agent_id}')
-        logger.info(f'Agent memory path: {self.save_temp_file_path}')
+        logger.info(f"Agent ID: {self.agent_id}")
+        logger.info(f"Agent memory path: {self.save_temp_file_path}")
 
         if self.use_skills and self.skills_dir:
             self.available_skills = load_skill_metadata(self.skills_dir)
@@ -506,7 +749,12 @@ class Agent:
                 logger.info("No skills loaded from %s", self.skills_dir)
             else:
                 skill_names = ", ".join(skill.name for skill in self.available_skills)
-                logger.info("Loaded %d skill(s) from %s: %s", len(self.available_skills), self.skills_dir, skill_names)
+                logger.info(
+                    "Loaded %d skill(s) from %s: %s",
+                    len(self.available_skills),
+                    self.skills_dir,
+                    skill_names,
+                )
         elif self.use_skills:
             logger.info("Skills enabled but no skills directory provided.")
 
@@ -514,7 +762,9 @@ class Agent:
             skill_catalog = ""
             if self.use_skills and self.available_skills:
                 skill_catalog = format_skill_catalog(self.available_skills)
-            planner_preplan_llm = self.planner_llm_raw if (self.use_search or self.use_skills) else None
+            planner_preplan_llm = (
+                self.planner_llm_raw if (self.use_search or self.use_skills) else None
+            )
             self.planner = Planner(
                 planner_llm=self.planner_llm,
                 task=self.task,
@@ -529,7 +779,9 @@ class Agent:
                 save_planner_conversation_path_encoding=self.save_planner_conversation_path_encoding,
             )
         elif self.use_skills:
-            logger.info("Skills enabled but planner is disabled. Set agent.use_plan=true to select skills.")
+            logger.info(
+                "Skills enabled but planner is disabled. Set agent.use_plan=true to select skills."
+            )
 
         # self.tool_calling_method = self.set_tool_calling_method(tool_calling_method)
         self.initiate_messages()
@@ -546,34 +798,35 @@ class Agent:
         self.retry_delay = retry_delay
         self._paused = False
         self._stopped = False
-        self.brain_memory = ''
-        self.summary_memory = ''
-        self.recent_memory = ''
+        self.brain_memory = ""
+        self.summary_memory = ""
+        self.recent_memory = ""
         # Pending step lines should not participate in memory budget/summarization until finalized.
-        self.pending_recent_memory = ''
+        self.pending_recent_memory = ""
         self.memory_snapshot_files: list[dict[str, Any]] = []
         self.infor_memory = []
         self.last_pid = None
         self.ask_for_help = False
-        
 
     def _set_model_names(self) -> None:
         self.chat_model_library = self.llm.__class__.__name__
-        if hasattr(self.llm, 'model_name'):
+        if hasattr(self.llm, "model_name"):
             self.model_name = self.llm.model_name  # type: ignore
-        elif hasattr(self.llm, 'model'):
+        elif hasattr(self.llm, "model"):
             self.model_name = self.llm.model  # type: ignore
         else:
-            self.model_name = 'Unknown'
+            self.model_name = "Unknown"
 
-    def set_tool_calling_method(self, tool_calling_method: Optional[str]) -> Optional[str]:
-        if tool_calling_method == 'auto':
-            if self.chat_model_library == 'ChatGoogleGenerativeAI':
+    def set_tool_calling_method(
+        self, tool_calling_method: Optional[str]
+    ) -> Optional[str]:
+        if tool_calling_method == "auto":
+            if self.chat_model_library == "ChatGoogleGenerativeAI":
                 return None
-            elif self.chat_model_library == 'ChatOpenAI':
-                return 'function_calling'
-            elif self.chat_model_library == 'AzureChatOpenAI':
-                return 'function_calling'
+            elif self.chat_model_library == "ChatOpenAI":
+                return "function_calling"
+            elif self.chat_model_library == "AzureChatOpenAI":
+                return "function_calling"
             else:
                 return None
 
@@ -612,7 +865,9 @@ class Agent:
         logger.debug(f"[Memory] Raw text: {cleaned_memory_response}")
         return json.loads(cleaned_memory_response)
 
-    async def _run_memory_summary(self, memory_text: str, context_label: str) -> tuple[str, str]:
+    async def _run_memory_summary(
+        self, memory_text: str, context_label: str
+    ) -> tuple[str, str]:
         memory_content = [
             {
                 "type": "text",
@@ -640,7 +895,9 @@ class Agent:
             return None
         step_value = step_override if step_override is not None else self.n_steps
         safe_name = file_name or f"memory_snapshot_{source}_step_{step_value}.txt"
-        saved_name = self.memory_snapshot_store.save(memory_text, safe_name, step=step_value)
+        saved_name = self.memory_snapshot_store.save(
+            memory_text, safe_name, step=step_value
+        )
         self.memory_snapshot_files.append(
             {
                 "file_name": saved_name,
@@ -656,7 +913,9 @@ class Agent:
         """
         await self._summarise_recent_memory()
 
-    async def _summarise_recent_memory(self, step_override: Optional[int] = None) -> None:
+    async def _summarise_recent_memory(
+        self, step_override: Optional[int] = None
+    ) -> None:
         if not self.recent_memory:
             return
         try:
@@ -666,13 +925,19 @@ class Agent:
             )
         except Exception:
             logger.exception("[Memory] Failed to summarize recent memory.")
-            self._save_memory_snapshot(self.recent_memory, "", "recent", step_override=step_override)
+            self._save_memory_snapshot(
+                self.recent_memory, "", "recent", step_override=step_override
+            )
             self._refresh_brain_memory()
             return
 
-        self._save_memory_snapshot(self.recent_memory, file_name, "recent", step_override=step_override)
+        self._save_memory_snapshot(
+            self.recent_memory, file_name, "recent", step_override=step_override
+        )
         if not summary:
-            logger.warning("[Memory] Empty summary from memory model; keeping recent memory.")
+            logger.warning(
+                "[Memory] Empty summary from memory model; keeping recent memory."
+            )
             self._refresh_brain_memory()
             return
 
@@ -684,7 +949,9 @@ class Agent:
         await self._summarise_summary_memory(step_override=step_override)
         self._refresh_brain_memory()
 
-    async def _summarise_summary_memory(self, step_override: Optional[int] = None) -> None:
+    async def _summarise_summary_memory(
+        self, step_override: Optional[int] = None
+    ) -> None:
         if not self.summary_memory:
             return
         if len(self.summary_memory) <= self.summary_memory_budget:
@@ -696,12 +963,18 @@ class Agent:
             )
         except Exception:
             logger.exception("[Memory] Failed to summarize accumulated summaries.")
-            self._save_memory_snapshot(self.summary_memory, "", "summary", step_override=step_override)
+            self._save_memory_snapshot(
+                self.summary_memory, "", "summary", step_override=step_override
+            )
             return
 
-        self._save_memory_snapshot(self.summary_memory, file_name, "summary", step_override=step_override)
+        self._save_memory_snapshot(
+            self.summary_memory, file_name, "summary", step_override=step_override
+        )
         if not summary:
-            logger.warning("[Memory] Empty high-level summary; keeping existing summaries.")
+            logger.warning(
+                "[Memory] Empty high-level summary; keeping existing summaries."
+            )
             self._refresh_brain_memory()
             return
         self.summary_memory = summary
@@ -715,17 +988,21 @@ class Agent:
         sorted_steps = sorted(self.brain_context.keys(), reverse=True)
         if not sorted_steps:
             return
-        current_state = self.brain_context[sorted_steps[0]]['current_state']
+        current_state = self.brain_context[sorted_steps[0]]["current_state"]
         # logger.debug(f"current_state: {current_state}")
-        step_goal = current_state['next_goal'] if current_state else None
+        step_goal = current_state["next_goal"] if current_state else None
         # logger.debug(f"step_goal: {step_goal}")
         step_id = sorted_steps[0]
 
         # Always write the current step as pending. The success/failed signal for step N
         # arrives in brain_step() of step (N+1). Pending lines do not count toward budget.
         line = f"Step {step_id} | Eval: pending | Goal: {step_goal}"
-        pending_lines = [ln for ln in self.pending_recent_memory.splitlines() if ln.strip()]
-        pending_lines = [ln for ln in pending_lines if not ln.startswith(f"Step {step_id} |")]
+        pending_lines = [
+            ln for ln in self.pending_recent_memory.splitlines() if ln.strip()
+        ]
+        pending_lines = [
+            ln for ln in pending_lines if not ln.startswith(f"Step {step_id} |")
+        ]
         pending_lines.append(line)
         self.pending_recent_memory = "\n".join(pending_lines).strip()
         self._refresh_brain_memory()
@@ -742,7 +1019,7 @@ class Agent:
             "next_goal": self.next_goal,
             "last_step_action": self.last_step_action,
             "infor_memory": self.infor_memory,
-            'brain_context': self.brain_context,
+            "brain_context": self.brain_context,
             "step": self.n_steps,
             "summary_memory": self.summary_memory,
             "pending_recent_memory": self.pending_recent_memory,
@@ -751,11 +1028,22 @@ class Agent:
             "memory_snapshot_files": self.memory_snapshot_files,
         }
         file_name = os.path.join(self.save_temp_file_path, f"memory.jsonl")
-        os.makedirs(os.path.dirname(file_name), exist_ok=True) if os.path.dirname(file_name) else None
-        with open(file_name, "w", encoding=self.save_brain_conversation_path_encoding) as f:
+        os.makedirs(os.path.dirname(file_name), exist_ok=True) if os.path.dirname(
+            file_name
+        ) else None
+        with open(
+            file_name, "w", encoding=self.save_brain_conversation_path_encoding
+        ) as f:
             if os.path.getsize(file_name) > 0:
                 f.truncate(0)
-            f.write(json.dumps(data, ensure_ascii=False, default=lambda o: list(o) if isinstance(o, set) else o) + "\n")
+            f.write(
+                json.dumps(
+                    data,
+                    ensure_ascii=False,
+                    default=lambda o: list(o) if isinstance(o, set) else o,
+                )
+                + "\n"
+            )
 
     async def load_memory(self) -> None:
         """
@@ -765,7 +1053,9 @@ class Agent:
             return
         file_name = os.path.join(self.save_temp_file_path, "memory.jsonl")
         if os.path.exists(file_name):
-            with open(file_name, "r", encoding=self.save_brain_conversation_path_encoding) as f:
+            with open(
+                file_name, "r", encoding=self.save_brain_conversation_path_encoding
+            ) as f:
                 lines = f.readlines()
             if len(lines) >= 1:
                 data = json.loads(lines[-1])
@@ -775,15 +1065,21 @@ class Agent:
                 # self.state_memory = data.get("state_memory", None)
                 self.brain_context = data.get("brain_context", OrderedDict())
                 if self.brain_context:
-                    self.brain_context = OrderedDict({int(k): v for k, v in self.brain_context.items()})
+                    self.brain_context = OrderedDict(
+                        {int(k): v for k, v in self.brain_context.items()}
+                    )
                 self.summary_memory = data.get("summary_memory", "")
                 self.pending_recent_memory = data.get("pending_recent_memory", "")
                 self.recent_memory = data.get("recent_memory", "")
-                self.summary_memory_budget = data.get("summary_memory_budget", self.summary_memory_budget)
+                self.summary_memory_budget = data.get(
+                    "summary_memory_budget", self.summary_memory_budget
+                )
                 self.memory_snapshot_files = data.get("memory_snapshot_files", [])
                 # Back-compat: older runs may have stored pending lines in recent_memory.
                 if self.recent_memory:
-                    recent_lines = [ln for ln in self.recent_memory.splitlines() if ln.strip()]
+                    recent_lines = [
+                        ln for ln in self.recent_memory.splitlines() if ln.strip()
+                    ]
                     keep_recent: list[str] = []
                     move_pending: list[str] = []
                     for ln in recent_lines:
@@ -793,7 +1089,14 @@ class Agent:
                             keep_recent.append(ln)
                     if move_pending:
                         self.pending_recent_memory = "\n".join(
-                            [ln for ln in [self.pending_recent_memory, "\n".join(move_pending)] if ln]
+                            [
+                                ln
+                                for ln in [
+                                    self.pending_recent_memory,
+                                    "\n".join(move_pending),
+                                ]
+                                if ln
+                            ]
                         ).strip()
                         self.recent_memory = "\n".join(keep_recent).strip()
                 if "summary_memory" not in data and "recent_memory" not in data:
@@ -824,10 +1127,14 @@ class Agent:
 
             if step_id == last_step:
                 line = f"Step {step_id} | Eval: pending | Goal: {step_goal}"
-                self.pending_recent_memory = "\n".join([ln for ln in [self.pending_recent_memory, line] if ln]).strip()
+                self.pending_recent_memory = "\n".join(
+                    [ln for ln in [self.pending_recent_memory, line] if ln]
+                ).strip()
                 continue
 
-            next_state = self.brain_context.get(step_id + 1, {}).get("current_state", {})
+            next_state = self.brain_context.get(step_id + 1, {}).get(
+                "current_state", {}
+            )
             raw_eval = str(next_state.get("step_evaluate", "")).lower()
             if "success" in raw_eval:
                 evaluation = "success"
@@ -837,13 +1144,17 @@ class Agent:
                 evaluation = "pending"
 
             line = f"Step {step_id} | Eval: {evaluation} | Goal: {step_goal}"
-            self.recent_memory = "\n".join([ln for ln in [self.recent_memory, line] if ln]).strip()
+            self.recent_memory = "\n".join(
+                [ln for ln in [self.recent_memory, line] if ln]
+            ).strip()
             if len(self.recent_memory) > self.memory_budget:
                 await self._summarise_recent_memory(step_override=step_id)
         self._refresh_brain_memory()
 
-    @time_execution_async('--brain_step')
-    async def brain_step(self,) -> dict:
+    @time_execution_async("--brain_step")
+    async def brain_step(
+        self,
+    ) -> dict:
         step_id = self.n_steps
         logger.info(f"\n📍 Step {self.n_steps}")
         prev_step_id = step_id - 1
@@ -852,13 +1163,16 @@ class Agent:
             screenshot = self.mac_tree_builder.capture_screenshot()
             self.screenshot_annotated = screenshot
             os.makedirs(self.images_dir, exist_ok=True)
-            current_screenshot_path = os.path.join(self.images_dir, f"screenshot_{self.n_steps}.png")
+            current_screenshot_path = os.path.join(
+                self.images_dir, f"screenshot_{self.n_steps}.png"
+            )
             screenshot.save(current_screenshot_path)
-            if self.screenshot_annotated:
-                screenshot_dataurl = screenshot_to_dataurl(self.screenshot_annotated)
-            if self.previous_screenshot:
-                previous_screenshot_dataurl = screenshot_to_dataurl(self.previous_screenshot)
-            info_files = "\n".join(str(item) for item in self.infor_memory) if self.infor_memory else "None"
+            info_files = (
+                "\n".join(str(item) for item in self.infor_memory)
+                if self.infor_memory
+                else "None"
+            )
+
             def build_state_content(
                 read_files_content: Optional[str] = None,
                 read_files_list: Optional[list[str]] = None,
@@ -871,7 +1185,7 @@ class Agent:
                                 f"Previous step is {prev_step_id}.\n\n"
                                 f"Recorded info files (filenames only):\n{info_files}\n\n"
                                 f"Previous Actions Short History:\n{self.brain_memory}\n\n"
-                            )
+                            ),
                         }
                     ]
                 else:
@@ -881,35 +1195,40 @@ class Agent:
                             "content": (
                                 "This is the first step.\n\n"
                                 "You should provide a JSON with a well-defined goal based on images information. The other fields should be default value."
-                            )
+                            ),
                         }
                     ]
                 if read_files_content:
                     files_label = ", ".join(read_files_list) if read_files_list else ""
-                    read_label = f"Requested file contents for: {files_label}\n" if files_label else "Requested file contents:\n"
-                    state_content.append({
-                        "type": "text",
-                        "content": f"{read_label}{read_files_content}"
-                    })
-                if step_id >= 2 and previous_screenshot_dataurl:
-                    state_content.append({
-                        "type": "image_url",
-                        "image_url": {"url": previous_screenshot_dataurl, "detail": "low"},
-                    })
-                if screenshot_dataurl:
-                    state_content.append({
-                        "type": "image_url",
-                        "image_url": {"url": screenshot_dataurl, "detail": "low"},
-                    })
+                    read_label = (
+                        f"Requested file contents for: {files_label}\n"
+                        if files_label
+                        else "Requested file contents:\n"
+                    )
+                    state_content.append(
+                        {"type": "text", "content": f"{read_label}{read_files_content}"}
+                    )
+                if step_id >= 2 and self.previous_screenshot:
+                    state_content.append(
+                        build_image_content_block(
+                            self.previous_screenshot, detail="high"
+                        )
+                    )
+                if self.screenshot_annotated:
+                    state_content.append(
+                        build_image_content_block(
+                            self.screenshot_annotated, detail="high"
+                        )
+                    )
                 return state_content
 
             state_content = build_state_content()
-            
+
             self.brain_message_manager._remove_last_state_message()
             self.brain_message_manager._remove_last_AIntool_message()
             self.brain_message_manager.add_state_message(state_content)
             brain_messages = self.brain_message_manager.get_messages()
-            
+
             response, brain_text = await self._ainvoke_json_text(
                 self.brain_llm,
                 brain_messages,
@@ -923,12 +1242,14 @@ class Agent:
                 self.brain_llm,
             )
             if "current_state" not in parsed or "analysis" not in parsed:
-                raise ValueError("Brain response missing required fields after read-files handling.")
+                raise ValueError(
+                    "Brain response missing required fields after read-files handling."
+                )
             self._save_brain_conversation(brain_messages, parsed, step=self.n_steps)
             self.brain_context[self.n_steps] = parsed
-            self.next_goal = parsed['current_state']['next_goal']
+            self.next_goal = parsed["current_state"]["next_goal"]
             self.brain_thought = parsed["analysis"]
-            self.current_state = parsed['current_state']
+            self.current_state = parsed["current_state"]
 
             # Finalize the previous step's memory line based on this response's evaluation signal.
             # Keep step N in pending_recent_memory until step (N+1) arrives, so it won't be summarized away.
@@ -941,7 +1262,9 @@ class Agent:
                 else:
                     final_status = "pending"
 
-                pending_lines = [ln for ln in self.pending_recent_memory.splitlines() if ln.strip()]
+                pending_lines = [
+                    ln for ln in self.pending_recent_memory.splitlines() if ln.strip()
+                ]
                 new_pending: list[str] = []
                 goal_text: Optional[str] = None
                 for ln in pending_lines:
@@ -954,8 +1277,14 @@ class Agent:
 
                 if goal_text is not None:
                     final_line = f"Step {prev_step_id} | Eval: {final_status} | Goal: {goal_text}"
-                    recent_lines = [ln for ln in self.recent_memory.splitlines() if ln.strip()]
-                    recent_lines = [ln for ln in recent_lines if not ln.startswith(f"Step {prev_step_id} |")]
+                    recent_lines = [
+                        ln for ln in self.recent_memory.splitlines() if ln.strip()
+                    ]
+                    recent_lines = [
+                        ln
+                        for ln in recent_lines
+                        if not ln.startswith(f"Step {prev_step_id} |")
+                    ]
                     recent_lines.append(final_line)
                     self.recent_memory = "\n".join(recent_lines).strip()
                     if len(self.recent_memory) > self.memory_budget:
@@ -972,21 +1301,25 @@ class Agent:
     @time_execution_async("--actor_step")
     async def actor_step(self, step_info: Optional[AgentStepInfo] = None) -> None:
         step_id = self.n_steps
-        state = "" # Default value
+        state = ""  # Default value
         model_output = None
         result: list[ActionResult] = []
         prev_step_id = step_id - 1
         try:
-            #---------------------------
+            # ---------------------------
             # 1) Build the UI tree and capture a screenshot
-            #---------------------------
-            logger.debug(f'Last PID: {self.last_pid}')
+            # ---------------------------
+            logger.debug(f"Last PID: {self.last_pid}")
             if self.use_ui:
                 self.last_pid = self.get_last_pid()
                 root = await self.mac_tree_builder.build_tree(self.last_pid)
-                state = root._get_visible_clickable_elements_string() if root else "No UI tree found."
+                state = (
+                    root._get_visible_clickable_elements_string()
+                    if root
+                    else "No UI tree found."
+                )
             else:
-                state = ''
+                state = ""
             self.save_memory()
             # ---------------------------
             # 3) Define the input message for the core agent
@@ -997,12 +1330,11 @@ class Agent:
                         {
                             "type": "text",
                             "content": f"Previous step is {prev_step_id}.\n\nYour goal to achieve in this step is: {self.next_goal}\n\n"
-                                        f"Analysis to the current screen is: {self.brain_thought}.\n\nCurrent UI state:\n{state}"
+                            f"Analysis to the current screen is: {self.brain_thought}.\n\nCurrent UI state:\n{state}",
                         },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated), "detail": "low"},
-                        }
+                        build_image_content_block(
+                            self.screenshot_annotated, detail="high"
+                        ),
                     ]
                 else:
                     state_content = [
@@ -1011,61 +1343,65 @@ class Agent:
                             "content": (
                                 f"Analysis to the current screen is: {self.brain_thought}.\n\n"
                                 f"Your goal to achieve in this step is: {self.next_goal}\n\n"
-                            )
+                            ),
                         },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated), "detail": "low"},
-                        }
+                        build_image_content_block(
+                            self.screenshot_annotated, detail="high"
+                        ),
                     ]
             else:
                 state_content = [
                     {
                         "type": "text",
-                        "content": f"Analysis to the current screen is: {self.brain_thought}. Your goal to achieve in this step is: {self.next_goal}"
+                        "content": f"Analysis to the current screen is: {self.brain_thought}. Your goal to achieve in this step is: {self.next_goal}",
                     },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": screenshot_to_dataurl(self.screenshot_annotated), "detail": "low"},
-                    }
+                    build_image_content_block(self.screenshot_annotated, detail="high"),
                 ]
             self.actor_message_manager._remove_last_AIntool_message()
             self.actor_message_manager._remove_last_state_message()
-            self.actor_message_manager.add_state_message(state_content, step_info = step_info)
-            
+            self.actor_message_manager.add_state_message(
+                state_content, step_info=step_info
+            )
+
             actor_messages = self.actor_message_manager.get_messages()
             model_output, raw = await self.get_next_action(actor_messages)
 
             self.last_goal = self.next_goal
             if self.register_new_step_callback:
                 self.register_new_step_callback(state, model_output, self.n_steps)
-            self._save_actor_conversation(actor_messages, model_output, step=self.n_steps)
+            self._save_actor_conversation(
+                actor_messages, model_output, step=self.n_steps
+            )
 
             self.actor_message_manager._remove_last_state_message()
             self.actor_message_manager.add_model_output(model_output)
-            
-            self.last_step_action = [action.model_dump(exclude_unset=True) for action in model_output.action] if model_output else []
+
+            self.last_step_action = (
+                [
+                    action.model_dump(exclude_unset=True)
+                    for action in model_output.action
+                ]
+                if model_output
+                else []
+            )
             # join the self.state_memory and the self.last_goal
 
             result = await self.controller.multi_act(
-                model_output.action,
-                self.mac_tree_builder,
-                action_valid=True
+                model_output.action, self.mac_tree_builder, action_valid=True
             )
             self._last_result = result
             if self.use_ui:
                 for i in range(len(model_output.action)):
-                    if 'open_app' in str(model_output.action[i]):
-                        logger.debug(f'Found open_app action, building the tree again')
+                    if "open_app" in str(model_output.action[i]):
+                        logger.debug(f"Found open_app action, building the tree again")
                         await self.mac_tree_builder.build_tree(self.get_last_pid())
             if len(self.last_step_action) == 0:
                 self.wait_this_step = True
-            elif 'wait' in str(self.last_step_action[0]):
+            elif "wait" in str(self.last_step_action[0]):
                 self.wait_this_step = True
             else:
                 self.wait_this_step = False
             if self.last_step_action and not self.wait_this_step:
-
                 await self._update_memory()
                 self.save_memory()
 
@@ -1081,26 +1417,28 @@ class Agent:
     async def _handle_step_error(self, error: Exception) -> list[ActionResult]:
         include_trace = logger.isEnabledFor(logging.DEBUG)
         error_msg = AgentError.format_error(error, include_trace=include_trace)
-        prefix = f'❌ Result failed {self.consecutive_failures + 1}/{self.max_failures} times:\n '
+        prefix = f"❌ Result failed {self.consecutive_failures + 1}/{self.max_failures} times:\n "
 
         if isinstance(error, (ValidationError, ValueError)):
-            logger.error(f'{prefix}{error_msg}')
-            if 'Max token limit reached' in error_msg:
+            logger.error(f"{prefix}{error_msg}")
+            if "Max token limit reached" in error_msg:
                 # Possibly reduce tokens from history
                 self.actor_message_manager.max_input_tokens -= 500
-                logger.info(f'Reducing agent max input tokens: {self.actor_message_manager.max_input_tokens}')
+                logger.info(
+                    f"Reducing agent max input tokens: {self.actor_message_manager.max_input_tokens}"
+                )
                 self.actor_message_manager.cut_messages()
-            elif 'Could not parse response' in error_msg:
-                error_msg += '\n\nReturn a valid JSON object with the required fields.'
+            elif "Could not parse response" in error_msg:
+                error_msg += "\n\nReturn a valid JSON object with the required fields."
             self.consecutive_failures += 1
 
         elif isinstance(error, RateLimitError):
-            logger.warning(f'{prefix}{error_msg}')
+            logger.warning(f"{prefix}{error_msg}")
             await asyncio.sleep(self.retry_delay)
             self.consecutive_failures += 1
 
         else:
-            logger.error(f'{prefix}{error_msg}')
+            logger.error(f"{prefix}{error_msg}")
             self.consecutive_failures += 1
 
         return [ActionResult(error=error_msg, include_in_memory=True)]
@@ -1118,33 +1456,21 @@ class Agent:
         )
         self.history.history.append(history_item)
 
-    @time_execution_async('--get_next_action')
+    @time_execution_async("--get_next_action")
     async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
         """
-        Build a 'structured_llm' approach on top of self.llm. 
+        Build a 'structured_llm' approach on top of self.llm.
         Using the dynamic self.AgentOutput
-        """        
+        """
         try:
             response, record = await self._ainvoke_json_text(
                 self.actor_llm,
                 input_messages,
                 label="Actor",
             )
-        except ValueError as exc:
-            fallback_actions = build_google_images_fallback_actions(
-                task=self.task,
-                next_goal=self.next_goal or self.task,
-            )
-            if fallback_actions is None:
-                raise
-            logger.warning("Actor LLM returned no usable content; applying deterministic Google Images fallback.")
-            parsed = AgentOutput(action=fallback_actions)
-            self._log_response(parsed)
-            return parsed, json.dumps(
-                {"action": [action.model_dump(exclude_unset=True) for action in fallback_actions]},
-                ensure_ascii=False,
-            )
-        logger.debug(f'LLM response: {response}')
+        except ValueError:
+            raise
+        logger.debug(f"LLM response: {response}")
         output_dict = json.loads(record)
         normalized_actions = []
         for action in output_dict.get("action", []):
@@ -1166,7 +1492,17 @@ class Agent:
                     self.infor_memory.append(saved_name)
             normalized_actions.append(action)
         normalized_actions = strip_premature_done_actions(normalized_actions)
+        normalized_actions = rewrite_browser_address_bar_actions(
+            normalized_actions,
+            task=self.task,
+            next_goal=self.next_goal,
+        )
         normalized_actions = rewrite_google_images_navigation_actions(
+            normalized_actions,
+            task=self.task,
+            next_goal=self.next_goal,
+        )
+        normalized_actions = rewrite_search_result_navigation_actions(
             normalized_actions,
             task=self.task,
             next_goal=self.next_goal,
@@ -1193,7 +1529,10 @@ class Agent:
                 return response, normalize_llm_json_text(raw_text)
             except ValueError as exc:
                 last_error = exc
-                if "no assistant content" not in str(exc).lower() or attempt >= max_attempts:
+                if (
+                    "no assistant content" not in str(exc).lower()
+                    or attempt >= max_attempts
+                ):
                     raise
                 logger.warning(
                     "%s response contained only SSE metadata; retrying once (%s/%s).",
@@ -1204,28 +1543,26 @@ class Agent:
 
         assert last_error is not None
         raise last_error
-    
 
     def _log_response(self, response: AgentOutput) -> None:
         current_state = getattr(self, "current_state", {}) or {}
         step_evaluate = str(current_state.get("step_evaluate", "unknown"))
-        if 'Success' in step_evaluate:
-            emoji = '✅'
-        elif 'Failed' in step_evaluate:
-            emoji = '❌'
+        if "Success" in step_evaluate:
+            emoji = "✅"
+        elif "Failed" in step_evaluate:
+            emoji = "❌"
         else:
-            emoji = '🤷'
-        logger.info(f'{emoji} Eval: {step_evaluate}')
-        logger.info(f'🧠 Memory: {getattr(self, "brain_memory", "")}')
-        logger.info(f'🎯 Goal to achieve this step: {getattr(self, "next_goal", "")}')
+            emoji = "🤷"
+        logger.info(f"{emoji} Eval: {step_evaluate}")
+        logger.info(f"🧠 Memory: {getattr(self, 'brain_memory', '')}")
+        logger.info(f"🎯 Goal to achieve this step: {getattr(self, 'next_goal', '')}")
         for i, action in enumerate(response.action):
-            logger.info(f'🛠️  Action {i + 1}/{len(response.action)}: {action.model_dump_json(exclude_unset=True)}')
-    
+            logger.info(
+                f"🛠️  Action {i + 1}/{len(response.action)}: {action.model_dump_json(exclude_unset=True)}"
+            )
+
     def _save_brain_conversation(
-        self,
-        input_messages: list[BaseMessage],
-        response: Any,
-        step: int
+        self, input_messages: list[BaseMessage], response: Any, step: int
     ) -> None:
         """
         Write all the Brain agent conversation (input messages + final AgentOutput)
@@ -1235,9 +1572,13 @@ class Agent:
         if not self.save_brain_conversation_path:
             return
         file_name = f"{self.save_brain_conversation_path}_brain_{step}.txt"
-        os.makedirs(os.path.dirname(file_name), exist_ok=True) if os.path.dirname(file_name) else None
+        os.makedirs(os.path.dirname(file_name), exist_ok=True) if os.path.dirname(
+            file_name
+        ) else None
 
-        with open(file_name, "w", encoding=self.save_brain_conversation_path_encoding) as f:
+        with open(
+            file_name, "w", encoding=self.save_brain_conversation_path_encoding
+        ) as f:
             # 1) Write input messages
             self._write_messages_to_file(f, input_messages)
             # 2) Write the final agent "response" (AgentOutput)
@@ -1247,10 +1588,7 @@ class Agent:
         logger.info(f"Brain conversation saved to: {file_name}")
 
     def _save_actor_conversation(
-        self,
-        input_messages: list[BaseMessage],
-        response: Any,
-        step: int
+        self, input_messages: list[BaseMessage], response: Any, step: int
     ) -> None:
         """
         Write all the Actor agent conversation (input messages + final AgentOutput)
@@ -1260,9 +1598,13 @@ class Agent:
         if not self.save_actor_conversation_path:
             return
         file_name = f"{self.save_actor_conversation_path}_actor_{step}.txt"
-        os.makedirs(os.path.dirname(file_name), exist_ok=True) if os.path.dirname(file_name) else None
+        os.makedirs(os.path.dirname(file_name), exist_ok=True) if os.path.dirname(
+            file_name
+        ) else None
 
-        with open(file_name, "w", encoding=self.save_actor_conversation_path_encoding) as f:
+        with open(
+            file_name, "w", encoding=self.save_actor_conversation_path_encoding
+        ) as f:
             # 1) Write input messages
             self._write_messages_to_file(f, input_messages)
             # 2) Write the final agent "response" (AgentOutput)
@@ -1277,35 +1619,35 @@ class Agent:
         Or adapt your existing logic from _write_messages_to_file.
         """
         for message in messages:
-            f.write(f"\n{message.__class__.__name__}\n{'-'*40}\n")
+            f.write(f"\n{message.__class__.__name__}\n{'-' * 40}\n")
             if isinstance(message.content, list):
                 for item in message.content:
                     if isinstance(item, dict):
-                        if item.get('type') == 'text':
-                            txt = item.get('content') or item.get('text', '')
+                        if item.get("type") == "text":
+                            txt = item.get("content") or item.get("text", "")
                             f.write(f"[Text Content]\n{txt.strip()}\n\n")
-                        elif item.get('type') == 'image_url':
-                            image_url = item['image_url']['url']
+                        elif item.get("type") == "image_url":
+                            image_url = item["image_url"]["url"]
                             f.write(f"[Image URL]\n{image_url[:100]}...\n\n")
             else:
                 # If it's a string or something else:
                 f.write(f"{str(message.content)}\n\n")
-            f.write('\n' + '='*60 + '\n')
+            f.write("\n" + "=" * 60 + "\n")
 
     def _write_response_to_file(self, f: Any, response: Any) -> None:
         """
         If the AgentOutput is JSON-like, you can do:
         """
-        f.write('RESPONSE\n')
+        f.write("RESPONSE\n")
         # If it's an AgentOutput, you might do:
         #   f.write(json.dumps(json.loads(response.model_dump_json(exclude_unset=True)), indent=2))
         # Otherwise just string-ify it:
-        f.write(str(response) + '\n')
+        f.write(str(response) + "\n")
 
-        f.write('\n' + '='*60 + '\n')
+        f.write("\n" + "=" * 60 + "\n")
 
     def _log_agent_run(self) -> None:
-        logger.info(f'🚀 Starting task: {self.task}')
+        logger.info(f"🚀 Starting task: {self.task}")
 
     async def run(self, max_steps: int = 100) -> AgentHistoryList:
         try:
@@ -1327,17 +1669,17 @@ class Agent:
                 await self.actor_step()
 
                 if self.history.is_done():
-                    logger.info('✅ Task completed successfully')
+                    logger.info("✅ Task completed successfully")
                     if self.register_done_callback:
                         self.register_done_callback(self.history)
                     break
                 await asyncio.sleep(2)  # Wait before next step
             else:
-                logger.info('❌ Failed to complete task in maximum steps')
+                logger.info("❌ Failed to complete task in maximum steps")
 
             return self.history
         except Exception:
-            logger.exception('Error running agent')
+            logger.exception("Error running agent")
             raise
 
     async def edit(self):
@@ -1347,7 +1689,9 @@ class Agent:
     PREFIX = "The overall user's task is: "
     SUFFIX = "The step by step plan is: "
 
-    def _set_new_task(self, generated_plan: str, plan_payload: Optional[dict] = None) -> None:
+    def _set_new_task(
+        self, generated_plan: str, plan_payload: Optional[dict] = None
+    ) -> None:
         """
         Build the final task string:
             "The overall plan is: <original task>\n\n<generated plan>"
@@ -1359,20 +1703,26 @@ class Agent:
         if generated_plan.startswith(self.PREFIX):
             final_task = generated_plan
         else:
-            final_task = f"{self.PREFIX}{self.original_task}\n{self.SUFFIX}\n{plan_text}"
+            final_task = (
+                f"{self.PREFIX}{self.original_task}\n{self.SUFFIX}\n{plan_text}"
+            )
 
         if self.use_skills and self.available_skills:
             selected = []
             if isinstance(plan_payload, dict):
                 selected = plan_payload.get("selected_skills", []) or []
             if isinstance(selected, list):
-                selected = [str(s) for s in selected if isinstance(s, str) and s.strip()]
+                selected = [
+                    str(s) for s in selected if isinstance(s, str) and s.strip()
+                ]
             else:
                 selected = []
 
             self.selected_skills = selected
             if self.selected_skills:
-                logger.info("Planner selected skills: %s", ", ".join(self.selected_skills))
+                logger.info(
+                    "Planner selected skills: %s", ", ".join(self.selected_skills)
+                )
             else:
                 logger.info("Planner selected no skills.")
             skill_contents = load_skill_contents(
@@ -1405,7 +1755,9 @@ class Agent:
 
         selected = payload.get("selected_skills")
         if isinstance(selected, list):
-            selected_clean = [str(s) for s in selected if isinstance(s, str) and s.strip()]
+            selected_clean = [
+                str(s) for s in selected if isinstance(s, str) and s.strip()
+            ]
             if selected_clean:
                 lines.append(f"Selected skills: {', '.join(selected_clean)}")
 
@@ -1433,13 +1785,13 @@ class Agent:
 
     def _too_many_failures(self) -> bool:
         if self.consecutive_failures >= self.max_failures:
-            logger.error(f'❌ Stopping due to {self.max_failures} consecutive failures')
+            logger.error(f"❌ Stopping due to {self.max_failures} consecutive failures")
             return True
         return False
 
     async def _handle_control_flags(self) -> bool:
         if self._stopped:
-            logger.info('Agent stopped')
+            logger.info("Agent stopped")
             return False
 
         while self._paused:
@@ -1456,7 +1808,7 @@ class Agent:
 
     def save_history(self, file_path: Optional[str | Path] = None) -> None:
         if not file_path:
-            file_path = 'AgentHistory.json'
+            file_path = "AgentHistory.json"
         self.history.save_to_file(file_path)
 
     def initiate_messages(self):
@@ -1464,32 +1816,32 @@ class Agent:
             llm=self.brain_llm,
             task=self.task,
             action_descriptions=self.controller.registry.get_prompt_description(),
-            system_prompt_class=BrainPrompt_turix, # Brain system prompt
+            system_prompt_class=BrainPrompt_turix,  # Brain system prompt
             max_input_tokens=self.max_input_tokens,
             include_attributes=self.include_attributes,
             max_error_length=self.max_error_length,
             max_actions_per_step=self.max_actions_per_step,
-            give_task=True
+            give_task=True,
         )
         self.actor_message_manager = MessageManager(
             llm=self.actor_llm,
             task=self.task,
             action_descriptions=self.controller.registry.get_prompt_description(),
-            system_prompt_class=ActorPrompt_turix, # Actor system prompt
+            system_prompt_class=ActorPrompt_turix,  # Actor system prompt
             max_input_tokens=self.max_input_tokens,
             include_attributes=self.include_attributes,
             max_error_length=self.max_error_length,
             max_actions_per_step=self.max_actions_per_step,
-            give_task=False
+            give_task=False,
         )
         self.memory_message_manager = MessageManager(
             llm=self.memory_llm,
             task=self.task,
             action_descriptions=self.controller.registry.get_prompt_description(),
-            system_prompt_class=MemoryPrompt, # Memory system prompt
+            system_prompt_class=MemoryPrompt,  # Memory system prompt
             max_input_tokens=self.max_input_tokens,
             include_attributes=self.include_attributes,
             max_error_length=self.max_error_length,
             max_actions_per_step=self.max_actions_per_step,
-            give_task=True
+            give_task=True,
         )

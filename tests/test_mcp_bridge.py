@@ -23,9 +23,11 @@ from config_env import resolve_env_placeholders
 
 
 def _create_launchable_project_root(base_dir: Path) -> Path:
-    (base_dir / "main.py").write_text("print('ok')\n", encoding="utf-8")
+    examples_dir = base_dir / "examples"
+    examples_dir.mkdir(parents=True, exist_ok=True)
+    (examples_dir / "main.py").write_text("print('ok')\n", encoding="utf-8")
     (base_dir / "mcp_job_runner.py").write_text("print('runner')\n", encoding="utf-8")
-    config_path = base_dir / "config.json"
+    config_path = examples_dir / "config.json"
     config_path.write_text(
         json.dumps({"agent": {"task": "original task"}}), encoding="utf-8"
     )
@@ -243,7 +245,7 @@ class RunTaskBridgeTests(unittest.TestCase):
                 )
 
         self.assertEqual(result["status"], "dry_run")
-        self.assertIn("main.py", " ".join(result["command"]))
+        self.assertIn("examples/main.py", " ".join(result["command"]))
         mock_run.assert_not_called()
 
     @patch("mcp_bridge.subprocess.run")
@@ -423,9 +425,11 @@ class RunTaskBridgeTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
-            config_path = project_root / "config.json"
+            examples_dir = project_root / "examples"
+            examples_dir.mkdir(parents=True, exist_ok=True)
+            config_path = examples_dir / "config.json"
             config_path.write_text(json.dumps(config), encoding="utf-8")
-            (project_root / "main.py").write_text("print('ok')\n", encoding="utf-8")
+            (examples_dir / "main.py").write_text("print('ok')\n", encoding="utf-8")
 
             with (
                 patch("mcp_bridge.PROJECT_ROOT", project_root),
@@ -709,7 +713,7 @@ class MCPJobRunnerTests(unittest.TestCase):
         self.assertEqual(stored["status"], "succeeded")
         self.assertEqual(stored["pid"], 4321)
         self.assertTrue(log_exists)
-        self.assertIn("main.py", " ".join(mock_popen.call_args.args[0]))
+        self.assertIn("examples/main.py", " ".join(mock_popen.call_args.args[0]))
         self.assertTrue(mock_popen.call_args.kwargs["start_new_session"])
 
     def test_runner_maps_non_zero_exit_to_failed(self) -> None:
@@ -937,8 +941,10 @@ class HealthCheckTests(unittest.TestCase):
     def test_health_check_reports_runner_entrypoint_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
-            (project_root / "main.py").write_text("print('ok')\n", encoding="utf-8")
-            config_path = project_root / "config.json"
+            examples_dir = project_root / "examples"
+            examples_dir.mkdir(parents=True, exist_ok=True)
+            (examples_dir / "main.py").write_text("print('ok')\n", encoding="utf-8")
+            config_path = examples_dir / "config.json"
             config_path.write_text(
                 json.dumps({"agent": {"task": "demo"}}), encoding="utf-8"
             )
@@ -948,8 +954,34 @@ class HealthCheckTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "error")
         self.assertIn("runner_path", result)
+        self.assertEqual(
+            result["main_path"], str(project_root / "examples" / "main.py")
+        )
         self.assertEqual(result["runner_path"], str(project_root / "mcp_job_runner.py"))
         self.assertFalse(result["runner_exists"])
+
+    def test_health_check_default_path_uses_examples_config_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            examples_dir = project_root / "examples"
+            examples_dir.mkdir(parents=True, exist_ok=True)
+            (examples_dir / "main.py").write_text("print('ok')\n", encoding="utf-8")
+            (project_root / "mcp_job_runner.py").write_text(
+                "print('runner')\n", encoding="utf-8"
+            )
+            (project_root / "config.json").write_text(
+                json.dumps({"agent": {"task": "root config should be ignored"}}),
+                encoding="utf-8",
+            )
+
+            with patch("mcp_bridge.PROJECT_ROOT", project_root):
+                result = health_check()
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(
+            result["config_path"], str(project_root / "examples" / "config.json")
+        )
+        self.assertFalse(result["config_exists"])
 
     def test_health_check_rejects_directory_config_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -986,6 +1018,25 @@ class ExampleConfigTests(unittest.TestCase):
         config = get_example_config()
         self.assertIn("agent", config)
         self.assertIn("task", config["agent"])
+
+    def test_get_example_config_defaults_to_examples_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            examples_dir = project_root / "examples"
+            examples_dir.mkdir(parents=True, exist_ok=True)
+            (examples_dir / "config.example.json").write_text(
+                json.dumps({"agent": {"task": "examples template"}}),
+                encoding="utf-8",
+            )
+            (project_root / "config.example.json").write_text(
+                json.dumps({"agent": {"task": "root template should be ignored"}}),
+                encoding="utf-8",
+            )
+
+            with patch("mcp_bridge.PROJECT_ROOT", project_root):
+                config = get_example_config()
+
+        self.assertEqual(config["agent"]["task"], "examples template")
 
     def test_get_example_config_returns_brain_llm_fields(self) -> None:
         config = get_example_config()
@@ -1043,7 +1094,9 @@ class ExampleConfigTests(unittest.TestCase):
 
 class ExampleTemplateTests(unittest.TestCase):
     def test_config_example_keeps_safe_template_defaults(self) -> None:
-        config_path = Path(__file__).resolve().parent.parent / "config.example.json"
+        config_path = (
+            Path(__file__).resolve().parent.parent / "examples" / "config.example.json"
+        )
         config = json.loads(config_path.read_text(encoding="utf-8"))
 
         self.assertEqual(config["brain_llm"]["provider"], "turix")

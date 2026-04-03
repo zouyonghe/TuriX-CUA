@@ -25,7 +25,7 @@ Or contact us with email: contact@turix.ai
 TuriX lets your powerful AI models take real, hands‑on actions directly on your desktop. 
 It ships with a **state‑of‑the‑art computer‑use agent** (achieves 80% success rate on our OSWorld‑style Mac benchmark and 60% success rate on OSWorld) yet stays 100 % open‑source and cost‑free for personal & research use.  
 
-Prefer your own model? **Copy `config.example.json` to `config.json`, edit it, and go.**
+Prefer your own model? **Copy `examples/config.example.json` to `examples/config.json`, edit it, and go.**
 
 ## Table of Contents
 - [📞 Contact & Community](#-contact--community)
@@ -108,7 +108,7 @@ This repo also includes a project-local `opencode.json` that points OpenCode at 
 
 If your TuriX environment uses a different Python executable, update the `command` array accordingly.
 
-The MCP server is intentionally thin: it prepares a temporary config, then launches the existing `main.py` entrypoint with the same Python interpreter.
+The MCP server is intentionally thin: it prepares a temporary config, then launches the existing `examples/main.py` entrypoint with the same Python interpreter.
 
 ---
 
@@ -140,7 +140,7 @@ git checkout mac_legacy
 
 **September 30, 2025** - 🎉 Exciting update! We've just released our latest AI model on the [TuriX API platform](https://turixapi.io), bringing enhanced performance, smarter reasoning, and seamless integration for even more powerful desktop automation. Developers and researchers, this is your cue—head over to the platform to access it now and elevate your workflows!
 
-Ready to level up? Update your `config.json` and start automating. Happy hacking! 🎉
+Ready to level up? Update your `examples/config.json` and start automating. Happy hacking! 🎉
 
 *Stay tuned to our [Discord](https://discord.gg/vkEYj4EV2n) for tips, user stories, and the next big drop.*
 
@@ -182,7 +182,7 @@ Ready to level up? Update your `config.json` and start automating. Happy hacking
 |------------|---------------|
 | **SOTA default model** | Outperforms previous open‑source agents (e.g. UI‑TARS) on success rate and speed on Mac |
 | **No app‑specific APIs** | If a human can click it, TuriX can too—WhatsApp, Excel, Outlook, in‑house tools… |
-| **Hot‑swappable "brains"** | Replace the VLM policy without touching code (`config.json`) |
+| **Hot‑swappable "brains"** | Replace the VLM policy without touching code (`examples/config.json`) |
 | **MCP‑ready** | Hook up *Claude for Desktop* or **any** agent via the Model Context Protocol (MCP) |
 | **Skills (markdown playbooks)** | Planner selects relevant skill guides (name + description), brain uses full instructions to plan each step |
 
@@ -265,10 +265,10 @@ to do JavaScript "alert(\"Triggering accessibility request\")" in document 1'
 > [!IMPORTANT]
 > **Task Configuration is Critical**: The quality of your task instructions directly impacts success rate. Clear, specific prompts lead to better automation results.
 
-Copy the template and edit task in `config.json`:
+Copy the template and edit task in `examples/config.json`:
 
 ```bash
-cp config.example.json config.json
+cp examples/config.example.json examples/config.json
 ```
 
 ```json
@@ -288,7 +288,7 @@ In this main (multi-agent) branch, you need to set the brain, actor, and memory 
 (`agent.use_plan: true`), you also need to set the planner model.
 We strongly recommand you to set the turix-actor model as the actor. The brain can be any VLMs you like, we provide qwen3.5vl in our platform. Gemini-3-pro is tested to be smartest, and Gemini-3-flash is fast and smart enough for most of the tasks.
 
-Edit API in `config.json`:
+Edit API in `examples/config.json`:
 ```json
 "brain_llm": {
       "provider": "turix",
@@ -342,9 +342,9 @@ For a local Ollama setup, point each role to your Ollama server:
 
 #### 4.3 Configure Custom Models (Optional)
 
-If you want to use other models not defined by the build_llm function in the main.py, you need to first define it, then setup the config.
+If you want to use other models not defined by the build_llm function in `examples/main.py`, you need to first define it, then setup the config.
 
-main.py:
+examples/main.py:
 
 ```
 if provider == "name_you_want":
@@ -371,7 +371,7 @@ description: Use when navigating GitHub in a browser (searching repos, starring,
 - Confirm the Star button state before moving on.
 ```
 
-Enable in `config.json`:
+Enable in `examples/config.json`:
 ```json
 {
   "agent": {
@@ -386,14 +386,14 @@ Enable in `config.json`:
 #### 4.5 Start the Agent
 
 ```bash
-python main.py
+python examples/main.py
 ```
 
 **Enjoy hands‑free computing 🎉**
 
 #### 4.6 Resume a Terminated Task
 
-To resume a task after an interruption, set a stable `agent_id` and enable `resume` in `config.json`:
+To resume a task after an interruption, set a stable `agent_id` and enable `resume` in `examples/config.json`:
 ```json
 {
     "agent": {

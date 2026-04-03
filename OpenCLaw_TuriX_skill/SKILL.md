@@ -44,7 +44,7 @@ skills/local/turix-mac/scripts/run_turix.sh "Open Chrome and go to github.com"
 skills/local/turix-mac/scripts/run_turix.sh --resume my-task-001
 ```
 
-> ✅ **Note**: `run_turix.sh` updates `config.json` for you (task, resume, `use_plan`, `use_skills`). If you want to keep a hand-edited config, copy `config.example.json` to `config.json` first, then skip passing a task and edit `config.json` directly.
+> ✅ **Note**: `run_turix.sh` updates `examples/config.json` for you (task, resume, `use_plan`, `use_skills`). If you want to keep a hand-edited config, copy `examples/config.example.json` to `examples/config.json` first, then skip passing a task and edit `examples/config.json` directly.
 
 
 ### Tips for Effective Tasks
@@ -86,7 +86,7 @@ Logs are saved to `.turix_tmp/logging.log` in the project directory. Check this 
 ```bash
 export PATH="/usr/sbin:$PATH"
 cd your_dir/TuriX-CUA
-/opt/anaconda3/envs/turix_env/bin/python main.py
+/opt/anaconda3/envs/turix_env/bin/python examples/main.py
 ```
 
 **Why?** The `screencapture` tool is located at `/usr/sbin/screencapture`, which is not in the default PATH.
@@ -97,7 +97,7 @@ cd your_dir/TuriX-CUA
 ps aux | grep "python.*main" | grep -v grep
 
 # Should show something like:
-# user  57425  0.0  2.4 412396704 600496 s143  Ss+  5:56PM   0:04.76 /opt/anaconda3/envs/turix_env/bin/python main.py
+# user  57425  0.0  2.4 412396704 600496 s143  Ss+  5:56PM   0:04.76 /opt/anaconda3/envs/turix_env/bin/python examples/main.py
 ```
 
 **Note:** The `.turix_tmp` directory may not be created until TuriX starts executing steps.
@@ -197,7 +197,7 @@ description: When performing X specific task
 
 ### 3. Enable Skills
 
-In `config.json`:
+In `examples/config.json`:
 
 ```json
 {
@@ -339,7 +339,7 @@ ls -lt your_dir/TuriX-CUA/.turix_tmp/brain_llm_interactions.log_brain_*.txt
 
 **Method 3: Check processes**
 ```bash
-ps aux | grep "python.*main.py" | grep -v grep
+ps aux | grep "python.*examples/main.py" | grep -v grep
 ```
 
 **Method 4: Check generated files**
@@ -367,10 +367,10 @@ ls -la your_dir/TuriX-CUA/.turix_tmp/*.txt
 
 | Issue | Check |
 |-------|-------|
-| Process unresponsive | `ps aux | grep main.py` |
+| Process unresponsive | `ps aux | grep examples/main.py` |
 | Stuck on step 1 | Check whether `.turix_tmp/` was created |
 | Model loading is slow | First run can take 1-2 minutes to load models |
-| No log output | Check `config.json` `logging_level` |
+| No log output | Check `examples/config.json` `logging_level` |
 
 ### 5. Force Stop
 
@@ -378,7 +378,7 @@ ls -la your_dir/TuriX-CUA/.turix_tmp/*.txt
 
 **Command**:
 ```bash
-pkill -f "python main.py"
+pkill -f "python examples/main.py"
 ```
 
 ### 6. View Results
@@ -407,7 +407,7 @@ cat your_dir/TuriX-CUA/.turix_tmp/latest_ai_news_summary_jan2026.txt
 ./run_turix.sh "Search AI news and summarize" &
 
 # 2. Wait a few seconds and check the process
-sleep 10 && ps aux | grep main.py
+sleep 10 && ps aux | grep examples/main.py
 
 # 3. Check if logs are being created
 ls -la your_dir/TuriX-CUA/.turix_tmp/

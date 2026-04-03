@@ -3,3 +3,5 @@ docs/plans/
 __pycache__/
 config
 config.json
+examples/config
+examples/config.json

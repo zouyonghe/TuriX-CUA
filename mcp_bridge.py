@@ -17,15 +17,8 @@ from job_status import read_status, update_status, write_status
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.json"
-DEFAULT_CONFIG_CANDIDATES = (
-    "config.json",
-    "config",
-    "config.example.json",
-    "config.example",
-)
-EXAMPLE_CONFIG_PATH = PROJECT_ROOT / "config.example.json"
-EXAMPLE_CONFIG_CANDIDATES = ("config.example.json", "config.example")
+DEFAULT_CONFIG_CANDIDATES = ("examples/config.json",)
+EXAMPLE_CONFIG_CANDIDATES = ("examples/config.example.json",)
 DEFAULT_TEMP_DIR = PROJECT_ROOT / ".turix_tmp" / "mcp"
 DEFAULT_OUTPUT_LIMIT = 4000
 
@@ -143,6 +136,8 @@ def run_task_bridge(
 ) -> dict[str, Any]:
     if not task or not task.strip():
         raise BridgeInputError("task must not be empty")
+    if agent_id is not None and not agent_id.strip():
+        raise BridgeInputError("agent_id must not be empty")
 
     base_config = _load_config(_resolve_config_path(config_path), resolve_env=False)
     runtime_config = build_runtime_config(
@@ -369,7 +364,7 @@ def _resolve_config_path(config_path: str | Path | None) -> Path:
     if config_path is None:
         return _resolve_existing_project_path(
             DEFAULT_CONFIG_CANDIDATES,
-            fallback=DEFAULT_CONFIG_PATH,
+            fallback=PROJECT_ROOT / DEFAULT_CONFIG_CANDIDATES[0],
         )
 
     path = Path(config_path).expanduser()
@@ -384,7 +379,7 @@ def _resolve_example_config_path(config_path: str | Path | None) -> Path:
 
     return _resolve_existing_project_path(
         EXAMPLE_CONFIG_CANDIDATES,
-        fallback=EXAMPLE_CONFIG_PATH,
+        fallback=PROJECT_ROOT / EXAMPLE_CONFIG_CANDIDATES[0],
     )
 
 
@@ -399,7 +394,7 @@ def _resolve_existing_project_path(
 
 
 def _main_entrypoint_path() -> Path:
-    return PROJECT_ROOT / "main.py"
+    return PROJECT_ROOT / "examples" / "main.py"
 
 
 def _runner_entrypoint_path() -> Path:
